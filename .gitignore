@@ -1,0 +1,61 @@
+.venv
+.venv*
+*.log
+experiments/temp/
+experiments/results/
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+
+# C extensions
+*.so
+
+# backup files
+*~
+
+# numpy data files
+*.npy
+
+# swig related
+*_double.py
+*_float.py
+*_wrap.c
+
+# Distribution / packaging
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+target/
+
+# Eclipse
+.project
+.pydevproject
+.settings
+
+# virtualenv
+.venvs
+*.cproject*
+*.prof
