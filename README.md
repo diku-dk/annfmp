@@ -20,15 +20,15 @@ When installed from source, [SWIG](http://www.swig.org/) is required.
 
 ## Quickstart
 
-The package can easily be installed via pip via::
+The package can easily be installed via pip via:
 
   `pip install annfmp`
 
-To install the package from the sources, first get the current stable release via::
+To install the package from the sources, first get the current stable release via:
 
   `git clone https://github.com/diku-dk/annfmp.git`
 
-Afterwards, on Linux systems, you can install the package locally for the current user via::
+Afterwards, on Linux systems, you can install the package locally for the current user via:
 
   `python setup.py install --user`
 
