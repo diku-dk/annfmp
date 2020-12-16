@@ -29,6 +29,11 @@ To install the package from the sources, first get the current stable release vi
 
   `git clone https://github.com/diku-dk/annfmp.git`
 
+We recommand to use virtualenv for installing the dependencies, for example:
+  `$ virtualenv -p python3 annfield`
+  `$ source annfield/bin/activate`
+  `$ pip install -r requirements.txt`
+
 Afterwards, on Linux systems, you can install the package locally for the current user via:
 
   `python setup.py install --user`

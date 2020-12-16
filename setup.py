@@ -5,7 +5,7 @@ from distutils.command.clean import clean as Clean
 
 DISTNAME = 'annfmp'
 DESCRIPTION = 'A Python library for the massively-parallel computation of nearest neighbor fields.'
-LONG_DESCRIPTION = open('README.rst').read()
+LONG_DESCRIPTION = open('README.md').read()
 MAINTAINER = 'Fabian Gieseke'
 MAINTAINER_EMAIL = 'fabian.gieseke@uni-muenster.de'
 URL = 'http://www.annfmp.pydata.org'
