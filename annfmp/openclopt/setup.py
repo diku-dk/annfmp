@@ -41,7 +41,7 @@ def configuration(parent_package='', top_path=None):
                             ('TIMING', 1)
                         ],
                         libraries=['OpenCL', 'm', 'cuda', 'nvrtc', 'cudart'],
-                        extra_compile_args=['-O3', '-w'] + ['-I' + ipath for ipath in include_paths])
+                        extra_compile_args=['-O3', "-std=c99", '-w'] + ['-I' + ipath for ipath in include_paths])
 
     return config
 

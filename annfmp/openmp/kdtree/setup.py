@@ -50,7 +50,7 @@ def configuration(parent_package='', top_path=None):
                             ('TIMING', 1)
                         ],
                         libraries=['gomp', 'm'],
-                        extra_compile_args=["-fopenmp", '-O3', '-w'] + ['-I' + ipath for ipath in include_paths])
+                        extra_compile_args=["-fopenmp", "-std=c99", '-O3', '-w'] + ['-I' + ipath for ipath in include_paths])
 
     # CPU + DOUBLE
     config.add_extension("_wrapper_cpu_double", 
@@ -62,7 +62,7 @@ def configuration(parent_package='', top_path=None):
                             ('TIMING', 1)
                         ],
                         libraries=['gomp', 'm'],
-                        extra_compile_args=["-fopenmp", '-O3', '-w'] + ['-I' + ipath for ipath in include_paths])
+                        extra_compile_args=["-fopenmp", "-std=c99", '-O3', '-w'] + ['-I' + ipath for ipath in include_paths])
 
     return config
 
