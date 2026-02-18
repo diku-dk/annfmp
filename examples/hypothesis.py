@@ -39,7 +39,7 @@ modelOpenmp = ANNField(
 flags = []
 
 ### Point these to your image pair ------------
-for x in range(199, 312, 2):
+for x in range(1, 3, 2):
     print(f"\n Current x: {x}\n")
     image_a = cv2.imread(f"../data/example/500/{x}.jpg")
     image_b = cv2.imread(f"../data/example/500/{x+1}.jpg")
