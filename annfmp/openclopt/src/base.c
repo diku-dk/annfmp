@@ -411,6 +411,18 @@ void fit_extern( FUTHARK_CTX_INP *params, int profile ) {
     							 );
     	//printf("Default leaf size: %d, actual leaf size: %d\n", leaf_size, m_prime / (1<<(height+1)) );
     }
+	int32_t *c_median_dimensions = (int32_t*)malloc(num_inner_nodes * sizeof(int32_t));
+	float *c_median_values = (float*)malloc(num_inner_nodes * sizeof(float));
+	futhark_values_i32_1d(fut_ctx, median_dims, c_median_dimensions);
+	futhark_values_f32_1d(fut_ctx, median_vals, c_median_values);
+
+	for (size_t i = 0; i < num_inner_nodes; i++) {
+		printf("Node %d: Splits on Dimension %d at Value %.4f\n", 
+            i, c_median_dimensions[i], c_median_values[i]);
+	}
+
+
+
 
     { // free original reference patch array.
     	int s = 0;
