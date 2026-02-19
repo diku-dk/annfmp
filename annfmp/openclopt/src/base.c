@@ -222,7 +222,7 @@ void pair_free( FUTHARK_CTX_INP *params ) {
 	struct futhark_context_config* fut_ctx = (struct futhark_context_config*) params->fut_ctx;
 	struct futhark_i32_3d* imgA   = (struct futhark_i32_3d*)params->imgA;
 	struct futhark_i32_3d* imgB   = (struct futhark_i32_3d*)params->imgB;
-	struct futhark_f32_2d* comps  = (struct futhark_f32_2d*)params->comps; 
+	struct futhark_f32_2d* comps  = (struct futhark_f32_2d*)params->comps;
 	struct futhark_f32_1d* means  = (struct futhark_f32_1d*)params->means;
 
 	int s = 0;
@@ -258,7 +258,7 @@ void fit_extern( FUTHARK_CTX_INP *params, int profile ) {
 	struct futhark_context_config* fut_ctx = (struct futhark_context_config*) params->fut_ctx;
 	struct futhark_i32_3d* imgA   = (struct futhark_i32_3d*)params->imgA;
 	struct futhark_i32_3d* imgB   = (struct futhark_i32_3d*)params->imgB;
-	struct futhark_f32_2d* comps  = (struct futhark_f32_2d*)params->comps; 
+	struct futhark_f32_2d* comps  = (struct futhark_f32_2d*)params->comps;
 	struct futhark_f32_1d* means  = (struct futhark_f32_1d*)params->means;
 	int32_t* nn_inds_host = (int32_t*)params->nn_inds_host;
 	float*   nn_dsts_host = (float*  )params->nn_dsts_host;
@@ -291,7 +291,7 @@ void fit_extern( FUTHARK_CTX_INP *params, int profile ) {
 	if(profile) {
 		unsigned long int elapsed;
 	    struct timeval t_start, t_end, t_diff;
-      	gettimeofday(&t_start, NULL); 
+      	gettimeofday(&t_start, NULL);
 
       	int s = 0;
 		s += futhark_entry_mkImgPatches(fut_ctx, &patches_A, psize, imgA);
@@ -340,7 +340,7 @@ void fit_extern( FUTHARK_CTX_INP *params, int profile ) {
 		printf("COSMIN 1\n");
 		unsigned long int elapsed;
 	    struct timeval t_start, t_end, t_diff;
-      	gettimeofday(&t_start, NULL); 
+      	gettimeofday(&t_start, NULL);
 
 		int s1 = futhark_entry_reducePatchDim( fut_ctx, &query_pts //output
 									, imgA, comps, means // input
@@ -350,7 +350,7 @@ void fit_extern( FUTHARK_CTX_INP *params, int profile ) {
 									);
 		cuCtxSynchronize();
 		printf("COSMIN 2\n");
-		
+
 		gettimeofday(&t_end, NULL);
       	timeval_subtract(&t_diff, &t_end, &t_start);
       	elapsed = (t_diff.tv_sec*1e6+t_diff.tv_usec);
@@ -378,11 +378,11 @@ void fit_extern( FUTHARK_CTX_INP *params, int profile ) {
     struct futhark_i32_1d* median_dims;
     struct futhark_f32_1d* median_vals;
     struct futhark_i32_1d* clanc_eqdim;
-      
+
     if(profile) { // 1. build the k-d tree
   	    unsigned long int elapsed;
 	    struct timeval t_start, t_end, t_diff;
-      	gettimeofday(&t_start, NULL); 
+      	gettimeofday(&t_start, NULL);
 
       	//height, num_inner_nodes, m_pad, leafs, indir, median_dims, median_vals, clanc_eqdim =
       	//		self.futobj_mktree.buildKDtree(256, array_patches_b_reduced)
@@ -392,10 +392,10 @@ void fit_extern( FUTHARK_CTX_INP *params, int profile ) {
     							 , leaf_size, refer_pts // input
     							 );
     	cuCtxSynchronize();
-    	
+
     	gettimeofday(&t_end, NULL);
       	timeval_subtract(&t_diff, &t_end, &t_start);
-      	elapsed = (t_diff.tv_sec*1e6+t_diff.tv_usec); 
+      	elapsed = (t_diff.tv_sec*1e6+t_diff.tv_usec);
       	if(profile)
       		printf("K-D Tree construction  (Futhark-CUDA): %lu microsecs\n", elapsed);
 
@@ -417,9 +417,11 @@ void fit_extern( FUTHARK_CTX_INP *params, int profile ) {
 	futhark_values_f32_1d(fut_ctx, median_vals, c_median_values);
 
 	for (size_t i = 0; i < num_inner_nodes; i++) {
-		printf("Node %d: Splits on Dimension %d at Value %.4f\n", 
+		printf("Node %d: Splits on Dimension %d at Value %.4f\n",
             i, c_median_dimensions[i], c_median_values[i]);
 	}
+	free(c_median_dimensions);
+	free(c_median_values);
 
 
 
@@ -436,13 +438,13 @@ void fit_extern( FUTHARK_CTX_INP *params, int profile ) {
     struct futhark_i32_2d* knn_ini_inds;
     struct futhark_f32_2d* knn_ini_dsts;
     struct futhark_i32_1d* nat_leaves;
-    
+
     if(profile) { // 2. for all queries, find the leaf to which the query naturally belongs to
   	    unsigned long int elapsed;
 	    struct timeval t_start, t_end, t_diff;
-      	gettimeofday(&t_start, NULL); 
+      	gettimeofday(&t_start, NULL);
 
-    	//  knn_ini_inds, knn_ini_dsts, nat_leaves = 
+    	//  knn_ini_inds, knn_ini_dsts, nat_leaves =
     	//		self.futobj_knn.findNaturalLeavesFixK(leaves, median_dims, median_vals, array_patches_a_reduced)
 
     	int s1 = futhark_entry_findNaturalLeavesFixK(fut_ctx,
@@ -450,7 +452,7 @@ void fit_extern( FUTHARK_CTX_INP *params, int profile ) {
             	leaves, median_dims, median_vals, query_pts// input
             );
     	cuCtxSynchronize();
-    	
+
     	gettimeofday(&t_end, NULL);
       	timeval_subtract(&t_diff, &t_end, &t_start);
       	elapsed = (t_diff.tv_sec*1e6+t_diff.tv_usec);
@@ -475,9 +477,9 @@ void fit_extern( FUTHARK_CTX_INP *params, int profile ) {
     if(profile) { // 3. compute the exact K-NNs for the first row
     	unsigned long int elapsed;
 	    struct timeval t_start, t_end, t_diff;
-      	gettimeofday(&t_start, NULL); 
+      	gettimeofday(&t_start, NULL);
 
-    	//  knn_inds_exact, knn_dsts_exact, loop_count = 
+    	//  knn_inds_exact, knn_dsts_exact, loop_count =
     	//	self.futobj_knn.exactKnnFixK(leafs, median_dims, median_vals, clanc_eqdim, self._n_cols, array_patches_a_reduced, nat_leaves, knn_ini_inds, knn_ini_dsts)
     	int s1 = futhark_entry_exactKnnFixK(fut_ctx,
     			&knn_inds_exact, &knn_dsts_exact, &loop_count, // output
@@ -524,7 +526,7 @@ void fit_extern( FUTHARK_CTX_INP *params, int profile ) {
     if (profile) { // 4. final propagation step
     	unsigned long int elapsed;
 	    struct timeval t_start, t_end, t_diff;
-      	gettimeofday(&t_start, NULL); 
+      	gettimeofday(&t_start, NULL);
 
     	// knn_inds, knn_dsts = self.futobj_knn.propagateFixK(height, self._n_rows, leafs, indir, array_patches_a_reduced, nat_leaves, knn_inds_exact, knn_dsts_exact)
     	int s1 = futhark_entry_propagateFixK(fut_ctx,
@@ -536,7 +538,7 @@ void fit_extern( FUTHARK_CTX_INP *params, int profile ) {
 
     	gettimeofday(&t_end, NULL);
       	timeval_subtract(&t_diff, &t_end, &t_start);
-      	elapsed = (t_diff.tv_sec*1e6+t_diff.tv_usec); 
+      	elapsed = (t_diff.tv_sec*1e6+t_diff.tv_usec);
       	if(profile)
 	      	printf("Final Propagation Step (Futhark-CUDA): %lu microsecs\n", elapsed);
 
@@ -566,7 +568,7 @@ void fit_extern( FUTHARK_CTX_INP *params, int profile ) {
       	}
       	if(profile)
       		printKNNs(kk, 32, knn_indices + 599*n_cols*kk, knn_distances + 599*n_cols*kk);
-      	
+
 	    free(knn_indices);
     	free(knn_distances);
     }
@@ -582,9 +584,9 @@ void fit_extern( FUTHARK_CTX_INP *params, int profile ) {
 		s += futhark_free_i32_1d(fut_ctx, orig2leaf);
 		s += futhark_free_i32_1d(fut_ctx, nat_leaves);
 		s += futhark_free_f32_2d(fut_ctx, knn_dsts_all);
-		
+
 		//s += futhark_free_i32_2d(fut_ctx, knn_inds_all);
-		
+
 		if (s != 0) {
       		printf("After Free Error: %s\nEXITING!\n", futhark_context_get_error(fut_ctx));
       		exit(1);
@@ -594,11 +596,11 @@ void fit_extern( FUTHARK_CTX_INP *params, int profile ) {
     struct futhark_i32_1d* nn_inds;
     struct futhark_f32_1d* nn_dsts;
     float  error = 33333333.3333;
-    
+
     if(profile) { // finally selecting the best nearest neigbor from the original image
 		unsigned long int elapsed;
 	    struct timeval t_start, t_end, t_diff;
-      	gettimeofday(&t_start, NULL); 
+      	gettimeofday(&t_start, NULL);
 
     	int s = futhark_entry_selectBestNN(
     							fut_ctx, &nn_inds, &nn_dsts, &error, // output
@@ -644,7 +646,7 @@ void fit_extern( FUTHARK_CTX_INP *params, int profile ) {
 
     { // Free cuda memory
     	int s1 = 0;
-		
+
 		s1 += futhark_free_i32_2d(fut_ctx, knn_inds_all);
 		s1 += futhark_free_i32_1d(fut_ctx, nn_inds);
 		s1 += futhark_free_f32_1d(fut_ctx, nn_dsts);
