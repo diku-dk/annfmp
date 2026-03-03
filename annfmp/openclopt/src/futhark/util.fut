@@ -11,7 +11,7 @@ let partition2Ind [n] (cs: [n]bool) : ([n]i32, i32) =
     let inds = map3 (\ c iT iF ->
                         if c then iT-1 else iF-1
                     ) cs isT isF
-    let inds_gather = scatter isT inds (iota n)
+    let inds_gather = scatter isT (map (\x -> i64.i32 x) inds) (map (\x -> i32.i64 x) (iota n))
     in (inds_gather, i)
 
 let sumSqrs [d] (xs: [d]f32) (ys: [d]f32) : f32 =
@@ -29,12 +29,12 @@ let gather2D 't [m][d] (arr2D: [][d]t) (inds: [m]i32) : *[m][d]t =
 
 let scatter2D [m][k][n] 't (arr2D: *[m][k]t) (qinds: [n]i32) (vals2D: [n][k]t) : *[m][k]t =
   let nk = n*k
-  let flat_qinds = map (\i -> let (d,r) = (i / k, i % k)
-                              in qinds[d]*k + r
-                       ) (iota nk)
-  let res1D = scatter (flatten arr2D) flat_qinds ((flatten vals2D) :> [nk]t) 
-  in  unflatten m k res1D 
-
+  let k' = i32.i64 k
+  let flat_qinds = map (\i -> let (d,r) = (i / k', i % k')
+                              in qinds[d]*k' + r
+                       ) (map (\x -> i32.i64 x) (iota nk))
+  let res1D = scatter (flatten arr2D) (map (\x -> i64.i32 x) flat_qinds) ((flatten vals2D) :> [nk]t) 
+  in  unflatten res1D 
 
 let getParent (node_index: i32) = (node_index-1) / 2
 
