@@ -2,7 +2,7 @@ let sumSqrsSeq [d] (xs: [d]f32) (ys: [d]f32) : f32 =
     loop (res) = (0.0f32) for (x,y) in (zip xs ys) do
         let z = x-y in res + z*z
 
-let bruteForce [m][d][k] (query: [d]f32) 
+let bruteForce [m][d][k] (query: [d]f32)
                          (knns0: [k](i32,f32))
                          (beg: i32, refs : [m][d]f32)
                        : [k](i32,f32) =
@@ -10,7 +10,7 @@ let bruteForce [m][d][k] (query: [d]f32)
       for i < m do
         let dist = sumSqrsSeq query (refs[i]) in
         if dist > knns[k-1].1 then knns -- early exit
-        else let ref_ind = i+beg in
+        else let ref_ind = (i32.i64 i)+beg in
              let (_, _, knns') =
                loop (dist, ref_ind, knns) for j < k do
                  let cur_nn = knns[j].1  in
@@ -38,7 +38,7 @@ let sortPartSortedSeqs [k] (knn: [k](i32,f32)) : [k](i32,f32) =
         in  (knn_sort, beg', end')
   in  res
 
-let bruteForcePar [m][d][k] (query: [d]f32) 
+let bruteForcePar [m][d][k] (query: [d]f32)
                          (knn0: [k](i32,f32))
                          (beg: i32, refs : [m][d]f32)
                        : [k](i32,f32) =
@@ -48,17 +48,17 @@ let bruteForcePar [m][d][k] (query: [d]f32)
   let j = 0i32
   let (_, knn, _, _) =
     loop (dists, knn, j, cycle)
-      while cycle && (j < k) do
+      while cycle && (j < (i32.i64 k)) do
         let (min_ind, min_val) =
-          reduce_comm (\ (i1,v1) (i2,v2) -> 
+          reduce_comm (\ (i1,v1) (i2,v2) ->
                         if v1 < v2 then (i1, v1) else
                         if v1 > v2 then (i2, v2) else
                         (if i1 <= i2 then i1 else i2, v1)
                       ) (m, f32.inf) (zip (iota m) dists)
-        
-        in  if min_val < (knn[k-1-j].1)
+
+        in  if min_val < (knn[k-1-(i64.i32 j)].1)
             then  let dists[min_ind] = f32.highest
-                  let knn[k-1-j] = (beg+min_ind, min_val)
+                  let knn[k-1-(i64.i32 j)] = (beg+(i32.i64 min_ind), min_val)
                   in  (dists, knn, j+1, true)
             else  (dists, knn, j, false)
   let knn_sort = sortPartSortedSeqs knn

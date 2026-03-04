@@ -10,7 +10,7 @@ let findLeaf [q][d] (median_dims: [q]i32) (median_vals: [q]f32)
         if query[median_dims[node_index]] <= median_vals[node_index]
         then (node_index+1)*2-1
         else (node_index+1)*2
-  in leaf - q
+  in leaf - (i32.i64 q)
 
 -- This is implemented for 1-dim
 -- height: the height of the tree (without leaves)
@@ -28,15 +28,15 @@ let traverseOnce [q] [d] (height: i32)
                  (kd_tree: [q](i32,f32,i32))
                  (query: [d]f32, wnn: f32)
                  (last_leaf: i32, stack: i32, dist: f32) : (i32, i32, f32) =
-  if last_leaf >= (q+1) then (q+1, stack, dist) else -- allows early exit.
+  if last_leaf >= ((i32.i64 q)+1) then ((i32.i64 q)+1, stack, dist) else -- allows early exit.
 
   let (median_dims, median_vals, clanc_eqdim) = unzip3 kd_tree
-  let last_leaf = last_leaf + q
+  let last_leaf = last_leaf + (i32.i64 q)
   let no_leaf   = 2*q + 1
 
   -- helper functions for reading and writing the stack,
   --   which is maintained as an int
-  let getPackedInd (stk: i32) (ind: i32) : bool = 
+  let getPackedInd (stk: i32) (ind: i32) : bool =
     let b = stk & (1<<ind) in b != 0
   let setPackedInd (stk: i32) (ind: i32) (v: bool) =
     let fst = stk & ((1<<ind)-1)
@@ -44,13 +44,13 @@ let traverseOnce [q] [d] (height: i32)
     let mid = if v then (1 << ind) else 0
     in  ( (fst | snd) | mid )
 
-  let getLevel (node_idx: i32) : i32 = log2 (node_idx+1) 
+  let getLevel (node_idx: i32) : i32 = log2 (node_idx+1)
   let getAncSameDimContrib (q_m_i: f32) (node_stack: i32) (node: i32) : f32 =
-    (loop (idx, res) = (node, 0.0f32) 
+    (loop (idx, res) = (node, 0.0f32)
       while (idx >= 0) do
         let anc = clanc_eqdim[idx] in
         if anc == (-1i32) then (-1i32, 0.0f32)
-        else 
+        else
           let anc_lev = getLevel anc
           let is_anc_visited = getPackedInd node_stack anc_lev
           in  if !is_anc_visited then (anc, res)
@@ -89,7 +89,7 @@ let traverseOnce [q] [d] (height: i32)
                            else -- update the stack
                                 let fst_node = node_index
                                 let snd_node = if (fst_node % 2) == 0 then fst_node-1 else fst_node+1
-                                let stack = setPackedInd stack count true 
+                                let stack = setPackedInd stack count true
                                 -- let stack[count] = true
                                 in  (parent, stack, count, dist_plus, snd_node)
   -- find a new leaf
@@ -97,11 +97,11 @@ let traverseOnce [q] [d] (height: i32)
       if parent_rec == 0 && rec_node == -1
       then -- we are done, we are at the root node
            -- and its second child has been visited
-           (no_leaf, stack, 0)
+           ((i32.i64 no_leaf), stack, 0i32)
 
       else -- now traverse downwards by computing `first`
            -- and stop when you discovered a new leaf
-           loop (node_index, stack, count) = 
+           loop (node_index, stack, count) =
                 (rec_node, stack, count)
            while !(isLeaf height node_index) do
               let count = count+1
@@ -113,4 +113,4 @@ let traverseOnce [q] [d] (height: i32)
                   else (node_index+1)*2
               in (node_index, stack, count)
 
-  in (new_leaf-q, new_stack, dist)
+  in (new_leaf- (i32.i64 q), new_stack, dist)
