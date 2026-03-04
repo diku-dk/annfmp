@@ -31,7 +31,7 @@ local let updateBounds [n] [d2] (level: i32) (median_dims: [n]i32) (median_vals:
       loop (ancestor,lubs_cur) for i < level do
         let k = level - i - 1
         let ancestor_child = compute_Kth_ancestor k node_ind
-        let anc_dim = median_dims[ancestor]
+        let anc_dim = i64.i32 median_dims[ancestor]
         let lub_ind = if  (ancestor_child & 1) == 0 then anc_dim else d+anc_dim
                       -- if right node, then update lower bound
         let anc_med = median_vals[ancestor]
@@ -62,7 +62,7 @@ local let findClosestMed [n] (cur_dim: i32) (median_dims: [n]i32) (node_ind: i32
 --         3. the index of the dimension that is split
 --         4. the median value of the split dimension
 --         5. the closest ancestor node index that splits the same dimension (or -1 if none)
-let mkKDtree [m] [d] (height: i32) (q: i32) (m' : i32)
+let mkKDtree [m] [d] (height: i32) (q: i64) (m' : i64)
                      (input: [m][d]f32) :
            (*[m'][d]f32, *[m']i32, *[q]i32, *[q]f32, *[q]i32) =
 
@@ -78,7 +78,7 @@ let mkKDtree [m] [d] (height: i32) (q: i32) (m' : i32)
 
          let num_pads = m' - m
          let input' = input ++ (replicate num_pads (replicate d f32.inf)) :> [m'][d]f32
-         let indir  = iota m'
+         let indir  = (map (\x -> i32.i64 x) (iota m'))
 
          let median_vals = replicate q 0.0f32
          let median_dims = replicate q (-1i32)
@@ -93,16 +93,16 @@ let mkKDtree [m] [d] (height: i32) (q: i32) (m' : i32)
                 , median_vals: *[q]f32
                 , clanc_eqdim: *[q]i32 )
              for lev < (height+1) do
-               let nodes_this_lvl = 1 << lev
+               let nodes_this_lvl = 1i64 << i64.i32 lev
                let pts_per_node_at_lev = m' / nodes_this_lvl
-               let indir2d = unflatten nodes_this_lvl pts_per_node_at_lev indir
+               let indir2d = unflatten (indir :> [nodes_this_lvl*pts_per_node_at_lev]i32)
 
                -- compute the dimensions to be split for each node at this level
                -- and also the index of the closest ancestor that has split the
                -- same dimension
                let (med_dims, anc_same_med) =
                     map (\ (i: i32) ->
-                            let node_ind = i + nodes_this_lvl - 1
+                            let node_ind = i + i32.i64 nodes_this_lvl - 1
                             -- walk from root to node and update bounds
                             let lubs_cur = updateBounds lev median_dims median_vals
                                                         node_ind (copy lubs)
@@ -111,10 +111,10 @@ let mkKDtree [m] [d] (height: i32) (q: i32) (m' : i32)
                             let (cur_dim, _) = reduce_comm (\ (i1,v1) (i2,v2) ->
                                                                 if v1 >= v2 then (i1, v1)
                                                                             else (i2, v2) )
-                                                           (-1, f32.lowest) <| zip (iota d) diffs
+                                                           (-1, f32.lowest) <| zip (map (\x -> i32.i64 x) (iota d)) diffs
                             let prev_anc = findClosestMed cur_dim median_dims node_ind
                             in  (cur_dim, prev_anc)
-                        ) (iota nodes_this_lvl)
+                        ) (map (\x -> i32.i64 x) (iota nodes_this_lvl))
                     |> unzip
                     --|> intrinsics.opaque
 
@@ -175,9 +175,9 @@ let mkKDtree [m] [d] (height: i32) (q: i32) (m' : i32)
 -- compiled input { 4i32 [[1f32],[2f32],[3f32],[4f32],[4f32],[5f32],[6f32],[7f32],[8f32],[8f32],[9f32],[2f32],[3f32],[4f32],[5f32]] }
 -- output { 1 2 3 4 5 6 7 8 }
 let main [m][d] (defppl: i32) (input: [m][d]f32) =
-    let (height, num_inner_nodes, ppl, m') = computeTreeShape m defppl
+    let (height, num_inner_nodes, ppl, m') = computeTreeShape (i32.i64 m) defppl
     let (leafs, indir, median_dims, median_vals, clanc_eqdim) =
-          mkKDtree height num_inner_nodes m' input
+          mkKDtree height (i64.i32 num_inner_nodes) (i64.i32 m') input
     in  (height, num_inner_nodes, m', leafs, indir, median_dims, median_vals, clanc_eqdim)
 
 --
