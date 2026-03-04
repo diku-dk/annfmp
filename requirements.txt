@@ -1,4 +1,6 @@
-numpy
-opencv-python==4.2.0.34
-scikit.learn
-pyopencl==2018.2.5
+numpy<2.0
+pyopencl
+scikit-learn
+setuptools<60
+swig
+opencv-python<=4.2.0.34
