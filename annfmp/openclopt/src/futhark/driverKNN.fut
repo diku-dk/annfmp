@@ -3,9 +3,10 @@ import "lib/github.com/diku-dk/sorts/radix_sort"
 import "buildKDtree"
 import "brute-force"
 import "kd-traverse"
+import "util"
 
 let sortQueriesByLeavesRadix [n] (num_bits: i32) (leaves: [n]i32) : ([n]i32, [n]i32) =
-  unzip <| radix_sort_by_key (\(l,_) -> l) num_bits i32.get_bit (zip leaves (iota n))
+  unzip <| radix_sort_by_key (\(l,_) -> l) num_bits i32.get_bit (zip leaves (map i32.i64 (iota n)))
 
 ----------------------------
 --- The fixed value of K ---
@@ -15,10 +16,12 @@ let kk = 8i32
 ---------------
 --- Helpers ---
 ---------------
+def ilog2 (n: i32) : i32 = (63 - i32.clz n)
+
 let getHeightPpl (q: i32) (m: i32) : (i32, i32, i32) =
   let num_nodes  = q
   let num_leaves = num_nodes + 1
-  let h = (log2 num_leaves) - 1
+  let h = (ilog2 num_leaves) - 1
   let ppl = m / num_leaves
   in  (h, ppl, num_leaves)
 
@@ -26,19 +29,19 @@ let getHeightPpl (q: i32) (m: i32) : (i32, i32, i32) =
 --- Breaking the image into patches ---
 ---------------------------------------
 entry mkImgPatches [h][w][c] (p: i32) (img: [h][w][c]i32) : [][]u8 =
-  let n_cols = w - p + 1
-  let n_rows = h - p + 1
-  let ppc = p*p*c
+  let n_cols = (i32.i64 w) - p + 1
+  let n_rows = (i32.i64 h) - p + 1
+  let ppc = p*p*(i32.i64 c)
   let n_all  = n_cols*n_rows
 
-  let mkPatch ii jj = 
-  	tabulate_2d p p
+  let mkPatch ii jj =
+  	tabulate_2d (i64.i32 p) (i64.i32 p)
   		(\i j ->
   			map (\k -> u8.i32 (img[ii+i, jj+j, k])) (iota c)
   		)
-  let res5d = tabulate_2d n_rows n_cols mkPatch
-  let res2d = map (\(patch: [p][p][c]u8) -> (flatten (flatten patch)) :> [ppc]u8)
-  				        ( (flatten res5d) :> [n_all][p][p][c]u8)
+  let res5d = tabulate_2d (i64.i32 n_rows) (i64.i32 n_cols) mkPatch
+  let res2d = map (\(patch: [i64.i32 p][i64.i32 p][c]u8) -> (flatten (flatten patch)) :> [i64.i32 ppc]u8)
+  				        ( (flatten res5d) :> [i64.i32 n_all][i64.i32 p][i64.i32 p][c]u8)
   in  res2d
 
 ----------------------------------------------
@@ -55,58 +58,58 @@ entry reducePatchDim [n][d][d_red] (img: [n][d]u8) (comps: [d_red][d]f32) (means
 -- manifesting the array of large patches but is slower!
 let reducePatchDim_OLD [d][d_red][h][w][c] (img: [h][w][c]i32) (comps: [d_red][d]f32) (means: [d]f32) : [][d_red]f32 =
   let pp = d / c
-  let p  = i32.f32 (f32.sqrt (f32.i32 pp))
-  let n_cols = w - p + 1
-  let n_rows = h - p + 1
+  let p  = i32.f32 (f32.sqrt (f32.i64 pp))
+  let n_cols = i32.i64 w - p + 1
+  let n_rows = i32.i64 h - p + 1
   let n_all  = n_cols*n_rows
   in
   map (\ ind_patch ->
         map (\ (comp: [d]f32) ->
-              let ii = intrinsics.opaque (ind_patch / n_cols)
-              let jj = intrinsics.opaque (ind_patch - (ii * n_cols)) 
+              let ii = (ind_patch / n_cols)
+              let jj = (ind_patch - (ii * n_cols))
               in  f32.sum <|
                   map3(\ (ijk: i32) (cmp: f32) (m: f32) ->
-                        let ij = ijk / c
-                        let k  = ijk - (ij * c)
+                        let ij = ijk / i32.i64 c
+                        let k  = ijk - (ij * i32.i64 c)
                         let i  = ij / p
                         let j  = ij - (i * p)
                         let v_img = f32.i32 (img[ii+i, jj+j, k])
                         in  ( v_img - m ) * cmp
-                      ) (iota d) comp means
+                      ) (map i32.i64 (iota d)) comp means
             ) comps
-      ) (iota n_all)
+      ) (map i32.i64 (iota (i64.i32 n_all)))
 
 
 ----------------------------------------------
 --- Selecting the best NN from large patch ---
 ----------------------------------------------
 
-entry selectBestNN_BAD [n][w1][w2][h1][h2][c] 
+entry selectBestNN_BAD [n][kk][w1][w2][h1][h2][c] -- Remove [kk] if errors occur...
                     (p: i32) (knn_inds: [n][kk]i32)
-                    (imgA: [h1][w1][c]f32) (imgB: [h2][w2][c]f32) 
+                    (imgA: [h1][w1][c]f32) (imgB: [h2][w2][c]f32)
                   : ([n]i32, [n]f32) =
   (knn_inds[:,0], replicate n 0.0f32)
 
-entry selectBestNN [n][w1][w2][h1][h2][c]
+entry selectBestNN [n][kk][w1][w2][h1][h2][c] -- Remove [kk] if errors occur...
                     (p: i32) (knn_inds: [n][kk]i32)
                     (imgA: [h1][w1][c]i32) (imgB: [h2][w2][c]i32)
                   : ([n]i32, [n]f32, f32) =
-  let n_colsA = w1 - p + 1
+  let n_colsA = i32.i64 w1 - p + 1
   --let n_rowsA = h1 - p + 1
-  let n_colsB = w2 - p + 1
+  let n_colsB = i32.i64 w2 - p + 1
   --let n_rowsB = h2 - p + 1
-  let patch_len = p*p*c
+  let patch_len = p*p*i32.i64 c
   let (nn_inds, nn_dsts) = unzip <|
-    map2(\knns indA -> 
+    map2(\knns indA ->
           let y = indA / n_colsA
           let x = indA - y * n_colsA
           let query = map (\ ijk ->
-                            let ij = ijk / c
-                            let k  = ijk - ij*c
+                            let ij = ijk / i32.i64 c
+                            let k  = ijk - ij*i32.i64 c
                             let i = ij / p
                             let j = ij - i*p
                             in  f32.i32 (imgA[y+i, x+j, k])
-                          ) (iota patch_len)
+                          ) (map i32.i64 (iota (i64.i32 patch_len)))
           let (nn_ind, nn_dst) = (-1i32, f32.inf) in
           loop (nn_ind, nn_dst) for q < kk do
             let indB = knns[q]
@@ -114,19 +117,19 @@ entry selectBestNN [n][w1][w2][h1][h2][c]
             let jj = indB - ii * n_colsB
             let dst = f32.sum <|
               map (\ ijk ->
-                    let ij = ijk / c
-                    let k  = ijk - ij*c
+                    let ij = ijk / i32.i64 c
+                    let k  = ijk - ij*i32.i64 c
                     let i = ij / p
                     let j = ij - i*p
                     let b_v = f32.i32 (imgB[ii+i, jj+j, k])
                     let a_v = query[ijk]
                     let d = b_v - a_v
                     in  d*d
-                  ) (iota patch_len)
+                  ) (map i32.i64 (iota (i64.i32 patch_len)))
             in  if dst < nn_dst
                 then (indB, dst)
                 else (nn_ind, nn_dst)
-        ) knn_inds (iota n)
+        ) knn_inds (map i32.i64 (iota n))
   let err = reduce (+) 0.0f32 nn_dsts
   in  (nn_inds, nn_dsts, f32.sqrt err)
 
@@ -140,29 +143,32 @@ entry selectBestNN [n][w1][w2][h1][h2][c]
 -- compiled random input { 256i32 [2097152][7]f32 }
 
 entry buildKDtree [m][d] (defppl: i32) (input: [m][d]f32) =
-    let (height, num_inner_nodes, ppl, m') = computeTreeShape m defppl
+    let (height, num_inner_nodes, ppl, m') = computeTreeShape (i32.i64 m) defppl
     let (leafs, indir, median_dims, median_vals, clanc_eqdim) =
-          mkKDtree height num_inner_nodes m' input
-    let orig2leaf = scatter (replicate m' (-1i32)) indir
-                            (map (\i -> i / ppl) (iota m'))
+          mkKDtree height (i64.i32 num_inner_nodes) (i64.i32 m') input
+    let orig2leaf = scatter (replicate (i64.i32 m') (-1i32)) (map i64.i32 indir)
+                            (map (\i -> i / ppl) (map i32.i64 (iota (i64.i32 m'))))
     in  (height, num_inner_nodes, m', leafs, indir, orig2leaf, median_dims, median_vals, clanc_eqdim)
 
 --------------------------------------------------------------
 --- Finding the natural leaf to which the query belongs to ---
 --------------------------------------------------------------
 let findNaturalLeaves [m][d][q][n] (k: i32)
-                                (ref_pts:  [m][d]f32) 
+                                (ref_pts:  [m][d]f32)
                                 (median_dims: [q]i32)
                                 (median_vals: [q]f32)
                                 (queries:  [n][d]f32) :
-                                (*[n][k]i32, *[n][k]f32, *[n]i32) =
-  let (h, ppl, num_leaves) = getHeightPpl q m
-  let leaves = unflatten num_leaves ppl ref_pts
+                                (*[n][i64.i32 k]i32, *[n][i64.i32 k]f32, *[n]i32) =
+  let (h, ppl, num_leaves) = getHeightPpl (i32.i64 q) (i32.i64 m)
+  let flat_leaves = flatten ref_pts
+  let leaves = unflatten (flat_leaves :> [i64.i32 num_leaves*i64.i32 ppl]f32)
+  -- let leaves = unflatten (flat_leaves :> [(i64.i32 num_leaves) * (i64.i32 ppl)]f32)
+
 
   let query_leaves0 = map (findLeaf median_dims median_vals h) queries
   let (query_leaves, query_inds) = sortQueriesByLeavesRadix (h+1) query_leaves0
   let queries = gather2D queries query_inds
-  let knns0 = map2(\leaf_ind query -> bruteForce query (replicate k (-1i32, f32.highest))
+  let knns0 = map2(\leaf_ind query -> bruteForce query (replicate (i64.i32 k) (-1i32, f32.highest))
                                                   (leaf_ind*ppl, leaves[leaf_ind])
                   ) query_leaves queries
   let dummy = replicate n (replicate k (-1i32, f32.highest))
@@ -171,7 +177,7 @@ let findNaturalLeaves [m][d][q][n] (k: i32)
   in  (knn_inds, knn_vals, query_leaves0)
 
 entry findNaturalLeavesFixK [m][d][q][n]
-                          (ref_pts:  [m][d]f32) 
+                          (ref_pts:  [m][d]f32)
                           (median_dims: [q]i32)
                           (median_vals: [q]f32)
                           (queries: [n][d]f32) :
@@ -208,7 +214,7 @@ let exactKnnOld [m][q][d][n][k]
 
           let (inds_part, n'') = partition2Ind <| map (\i -> new_leaves[i] < num_leaves) (iota n')
           let qinds_part = gather1D query_inds inds_part
-          
+
           let (inds1, inds2) = split n'' <| zip inds_part qinds_part
           let (iota_valid, query_inds') = unzip inds1
           let (iota_done,  qinds_updt ) = unzip inds2
@@ -284,7 +290,7 @@ entry exactKnnFixK [m][q][d][n]
   let (knn_inds, knn_dsts) = unzip <| map unzip <| ord_knns
   let knn_is[:s] = knn_inds
   let knn_vs[:s] = knn_dsts
-  
+
   in (knn_is, knn_vs, loop_count)
 
 ------------------------------
@@ -331,7 +337,7 @@ let propagate [m][d][nr][nc][k]
                     loop (n_inds, u_leafs)
                       for q < k do
                         -- let par_ind = par_inds[q] / ppl
-                        let par_ind = 
+                        let par_ind =
                           estimateIndex nr nc indir orig2leaf (par_inds[q])
 
                         let not_found = par_ind != nat_leaf
@@ -360,8 +366,8 @@ let propagate [m][d][nr][nc][k]
       let knns[i] = new_knn_row
       in  knns
   in  knns'
-      
---      let new_knn_row = 
+
+--      let new_knn_row =
 --          map4(\(par_inds0: [k]i32) (knn0: [k](i32,f32)) (nat_leaf: i32) (query: [d]f32) ->
 --                  let par_inds = intrinsics.opaque (copy par_inds0)
 --                  let u_leafs = replicate k (-1i32)
@@ -391,7 +397,7 @@ let propagate [m][d][nr][nc][k]
 
 entry propagateFixK [m][d][n]
               (h: i32)
-              (nr: i32) -- assumes `nr` equaly divides `n` 
+              (nr: i32) -- assumes `nr` equaly divides `n`
               (ref_pts: [m][d]f32)
               (indir:   [m]i32)
               (orig2leaf: [m]i32)
@@ -407,8 +413,8 @@ entry propagateFixK [m][d][n]
 
   let knns' = propagate h ref_pts indir orig2leaf queries nat_leaves knns
   let knns_flat' = flatten knns' :> [n][kk](i32,f32)
-  let (knn_inds', knn_dsts') = unzip <| map unzip knns_flat' 
-            
+  let (knn_inds', knn_dsts') = unzip <| map unzip knns_flat'
+
 
   let knn_inds'' = map (\kinds -> map (\ind -> indir[ind]) kinds) knn_inds'
   in (knn_inds'', knn_dsts')
