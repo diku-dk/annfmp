@@ -175,7 +175,7 @@ let mkKDtree [m] [d] (height: i32) (q: i64) (m' : i64)
 -- compiled input { 4i32 [[1f32],[2f32],[3f32],[4f32],[4f32],[5f32],[6f32],[7f32],[8f32],[8f32],[9f32],[2f32],[3f32],[4f32],[5f32]] }
 -- output { 1 2 3 4 5 6 7 8 }
 let main [m][d] (defppl: i32) (input: [m][d]f32) =
-    let (height, num_inner_nodes, ppl, m') = computeTreeShape (i32.i64 m) defppl
+    let (height, num_inner_nodes, _ppl, m') = computeTreeShape (i32.i64 m) defppl
     let (leafs, indir, median_dims, median_vals, clanc_eqdim) =
           mkKDtree height (i64.i32 num_inner_nodes) (i64.i32 m') input
     in  (height, num_inner_nodes, m', leafs, indir, median_dims, median_vals, clanc_eqdim)

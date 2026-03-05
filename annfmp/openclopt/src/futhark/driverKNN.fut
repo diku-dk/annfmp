@@ -11,19 +11,19 @@ let sortQueriesByLeavesRadix [n] (num_bits: i32) (leaves: [n]i32) : ([n]i32, [n]
 ----------------------------
 --- The fixed value of K ---
 ----------------------------
-let kk = 8i32
+let kk = 8i64
 
 ---------------
 --- Helpers ---
 ---------------
 def ilog2 (n: i32) : i32 = (63 - i32.clz n)
 
-let getHeightPpl (q: i32) (m: i32) : (i32, i32, i32) =
+let getHeightPpl (q: i32) (m: i32) : (i32, i64, i64) =
   let num_nodes  = q
   let num_leaves = num_nodes + 1
   let h = (ilog2 num_leaves) - 1
   let ppl = m / num_leaves
-  in  (h, ppl, num_leaves)
+  in  (h, i64.i32 ppl, i64.i32 num_leaves)
 
 ---------------------------------------
 --- Breaking the image into patches ---
@@ -65,8 +65,8 @@ let reducePatchDim_OLD [d][d_red][h][w][c] (img: [h][w][c]i32) (comps: [d_red][d
   in
   map (\ ind_patch ->
         map (\ (comp: [d]f32) ->
-              let ii = (ind_patch / n_cols)
-              let jj = (ind_patch - (ii * n_cols))
+              let ii = opaque (ind_patch / n_cols)
+              let jj = opaque (ind_patch - (ii * n_cols))
               in  f32.sum <|
                   map3(\ (ijk: i32) (cmp: f32) (m: f32) ->
                         let ij = ijk / i32.i64 c
@@ -84,13 +84,13 @@ let reducePatchDim_OLD [d][d_red][h][w][c] (img: [h][w][c]i32) (comps: [d_red][d
 --- Selecting the best NN from large patch ---
 ----------------------------------------------
 
-entry selectBestNN_BAD [n][kk][w1][w2][h1][h2][c] -- Remove [kk] if errors occur...
-                    (p: i32) (knn_inds: [n][kk]i32)
-                    (imgA: [h1][w1][c]f32) (imgB: [h2][w2][c]f32)
+entry selectBestNN_BAD [n][w1][w2][h1][h2][c] -- Remove [kk] if errors occur...
+                    (_p: i32) (knn_inds: [n][kk]i32)
+                    (_imgA: [h1][w1][c]f32) (_imgB: [h2][w2][c]f32)
                   : ([n]i32, [n]f32) =
   (knn_inds[:,0], replicate n 0.0f32)
 
-entry selectBestNN [n][kk][w1][w2][h1][h2][c] -- Remove [kk] if errors occur...
+entry selectBestNN [n][w1][w2][h1][h2][c] -- Remove [kk] if errors occur...
                     (p: i32) (knn_inds: [n][kk]i32)
                     (imgA: [h1][w1][c]i32) (imgB: [h2][w2][c]i32)
                   : ([n]i32, [n]f32, f32) =
@@ -111,7 +111,7 @@ entry selectBestNN [n][kk][w1][w2][h1][h2][c] -- Remove [kk] if errors occur...
                             in  f32.i32 (imgA[y+i, x+j, k])
                           ) (map i32.i64 (iota (i64.i32 patch_len)))
           let (nn_ind, nn_dst) = (-1i32, f32.inf) in
-          loop (nn_ind, nn_dst) for q < kk do
+          loop (nn_ind, nn_dst) for q < i32.i64 kk do
             let indB = knns[q]
             let ii = indB / n_colsB
             let jj = indB - ii * n_colsB
@@ -160,29 +160,34 @@ let findNaturalLeaves [m][d][q][n] (k: i64)
                                 (queries:  [n][d]f32) :
                                 (*[n][k]i32, *[n][k]f32, *[n]i32) =
   let (h, ppl, num_leaves) = getHeightPpl (i32.i64 q) (i32.i64 m)
-  let flat = flatten ref_pts :> [i64.i32 num_leaves * i64.i32 ppl * d]f32
-  let leaves = unflatten_3d flat
-  -- let flat_leaves = flatten ref_pts
-  -- let leaves = unflatten (flat_leaves :> [(i64.i32 num_leaves) * (i64.i32 ppl)]f32)
+  
+  let ref_pts_tmp = ref_pts :> [num_leaves*ppl][d]f32
+  let leaves = unflatten ref_pts_tmp
+
 
   let query_leaves0 = map (findLeaf median_dims median_vals h) queries
   let (query_leaves, query_inds) = sortQueriesByLeavesRadix (h+1) query_leaves0
   let queries = gather2D queries query_inds
   let knns0 = map2(\leaf_ind query -> bruteForce query (replicate k (-1i32, f32.highest))
-                                                  (leaf_ind*ppl, leaves[leaf_ind])
+                                                  (leaf_ind * i32.i64 ppl, leaves[leaf_ind])
                   ) query_leaves queries
-  let dummy = replicate n (replicate k (-1i32, f32.highest))
-  let knns0' = scatter2D dummy query_inds knns0
-  let (knn_inds, knn_vals) = unzip <| map unzip knns0'
-  in  (copy knn_inds, copy knn_vals, query_leaves0)
+  -- let dummy = replicate n (replicate (i64.i32 k) (-1i32, f32.highest))
+  -- let knns0' = scatter2D dummy query_inds knns0
+  -- let (knn_inds, knn_vals) = unzip <| map unzip knns0'
+  let dummy_inds = replicate n (replicate k (-1i32))
+  let dummy_vals = replicate n (replicate k f32.highest)
+  let (knns0_inds, knns0_vals) = unzip <| map unzip knns0
+  let knn_inds = scatter2D dummy_inds query_inds knns0_inds
+  let knn_vals = scatter2D dummy_vals query_inds knns0_vals
+  in  (knn_inds, knn_vals, query_leaves0)
 
 entry findNaturalLeavesFixK [m][d][q][n]
                           (ref_pts:  [m][d]f32)
                           (median_dims: [q]i32)
                           (median_vals: [q]f32)
                           (queries: [n][d]f32) :
-                          (*[n][i64.i32 kk]i32, *[n][i64.i32 kk]f32, *[n]i32) =
-  findNaturalLeaves (i64.i32 kk) ref_pts median_dims median_vals queries
+                          (*[n][kk]i32, *[n][kk]f32, *[n]i32) =
+  findNaturalLeaves kk ref_pts median_dims median_vals queries
 
 -----------------------------
 --- Finding the exact knn ---
@@ -194,14 +199,16 @@ let exactKnnOld [m][q][d][n][k]
               (nat_leaves :[n]i32)
               (knns:    [n][k](i32,f32)) : ([n][k](i32,f32), i32) =
   let (h, ppl, num_leaves) = getHeightPpl (i32.i64 q) (i32.i64 m)
-  let flat = flatten ref_pts :> [i64.i32 num_leaves * i64.i32 ppl * d]f32
-  let leaves = unflatten_3d flat
+  
+  let ref_pts_tmp = ref_pts :> [num_leaves*ppl][d]f32
+  let leaves = unflatten ref_pts_tmp
+  -- let leaves = unflatten num_leaves ppl ref_pts
 
   let last_leaves = nat_leaves
   let stacks = replicate n 0i32
   let dists  = replicate n 0.0f32
   let ord_knns = copy knns
-  let query_inds = iota n
+  let query_inds = map i32.i64 (iota n)
   let n' = n
   let i = 0i32
 
@@ -213,15 +220,15 @@ let exactKnnOld [m][q][d][n][k]
           let (new_leaves, new_stacks, new_dists) = unzip3 <|
             map2 (traverseOnce h kd_tree) (zip queries wnns) (zip3 last_leaves stacks dists)
 
-          let (inds_part, n'') = partition2Ind <| map (\i -> new_leaves[i] < num_leaves) (iota n')
+          let (inds_part, n'') = partition2Ind <| map (\i -> new_leaves[i] < i32.i64 num_leaves) (iota n')
+          let n'' = i64.i32 n''
           let qinds_part = gather1D query_inds inds_part
 
-          -- let (inds1, inds2) = split (i64.i32 n'') <| zip inds_part qinds_part
-          let zipped = zip inds_part qinds_part
-          let inds1 = take (i64.i32 n'') zipped
-          let inds2 = drop (i64.i32 n'') zipped
-          let (iota_valid, query_inds') = unzip inds1
-          let (iota_done,  qinds_updt ) = unzip inds2
+          -- let (inds1, inds2) = split n'' <| zip inds_part qinds_part
+          -- let (iota_valid, query_inds') = unzip inds1
+          -- let (iota_done,  qinds_updt ) = unzip inds2
+          let (iota_valid, query_inds') = (inds_part[0: n''], qinds_part[0: n''])
+          let (iota_done,  qinds_updt ) = (inds_part[n'' : ], qinds_part[n'' : ])
 
           -- get valid part of arrays
           let queries' =  gather2D queries iota_valid
@@ -230,26 +237,26 @@ let exactKnnOld [m][q][d][n][k]
                           gather1D (zip3 new_leaves new_stacks new_dists) iota_valid
 
           -- update global knns
-          let qinds_updt_i32 = map i32.i64 qinds_updt
-          let ord_knns' = scatter2D ord_knns qinds_updt_i32 (gather2D knns iota_done)
+          let ord_knns' = scatter2D ord_knns qinds_updt (gather2D knns iota_done)
 
           -- do brute force
-          let knns'' = map3 (\query knn leaf_ind -> bruteForcePar query knn (leaf_ind*ppl, leaves[leaf_ind]))
+          let knns'' = map3 (\query knn leaf_ind -> bruteForcePar query knn (leaf_ind * i32.i64 ppl, leaves[leaf_ind]))
                             queries' knns' new_leaves'
-          in  (queries', knns'', new_leaves', new_stacks', new_dists', ord_knns', query_inds', i+1, i64.i32 n'')
+          in  (queries', knns'', new_leaves', new_stacks', new_dists', ord_knns', query_inds', i+1, n'')
   in  (ord_knns', loop_count)
 
 let exactKnn [m][q][d][n][k]
               (ref_pts: [m][d]f32)
               (kd_tree: [q](i32,f32,i32))
               (queries: [n][d]f32)
-              (nat_leaves :[n]i32)
+              (nat_leaves: *[n]i32)
               (knns:   *[n][k](i32,f32)) : (*[n][k](i32,f32), i32) =
   let (h, ppl, num_leaves) = getHeightPpl (i32.i64 q) (i32.i64 m)
-  let flat = flatten ref_pts :> [i64.i32 num_leaves * i64.i32 ppl * d]f32
-  let leaves = unflatten_3d flat
+  -- let leaves = unflatten num_leaves ppl ref_pts
+  let ref_pts_tmp = ref_pts :> [num_leaves*ppl][d]f32
+  let leaves = unflatten ref_pts_tmp
 
-  let last_leaves = copy nat_leaves
+  let last_leaves = nat_leaves
   let stacks = replicate n 0i32
   let dists  = replicate n 0.0f32
   let n' = n
@@ -262,38 +269,40 @@ let exactKnn [m][q][d][n][k]
           let (new_leaves, new_stacks, new_dists) = unzip3 <|
             map2 (traverseOnce h kd_tree) (zip queries wnns) (zip3 last_leaves stacks dists)
 
-          let n'' = map (\leaf_ind -> if leaf_ind < num_leaves then 1i32 else 0i32) new_leaves
+          let n'' = map (\leaf_ind -> if leaf_ind < i32.i64 num_leaves then 1i32 else 0i32) new_leaves
                  |> reduce_comm (+) 0i32
+                 |> opaque
 
           -- do brute force
           let knns' = map3 (\query knn leaf_ind ->
                               -- let knn = intrinsics.opaque <| copy knn0
-                              let count = if leaf_ind < num_leaves then 1i32 else 0i32
+                              let count = if leaf_ind < i32.i64 num_leaves then 1i32 else 0i32
                               in  loop (knn) for _j < count do
-                                      bruteForcePar query knn (leaf_ind*ppl, leaves[leaf_ind])
+                                      bruteForcePar query knn (leaf_ind * i32.i64 ppl, leaves[leaf_ind])
                            ) queries knns new_leaves
+                    |> opaque
 
           in  (knns', new_leaves, new_stacks, new_dists, i+1, i64.i32 n'')
   in  (ord_knns', loop_count)
 
-entry exactKnnFixK [m][kk][q][d][n] -- Delete [kk] if necessary
+entry exactKnnFixK [m][q][d][n]
               (ref_pts: [m][d]f32)
               (median_dims: [q]i32)
               (median_vals: [q]f32)
               (prev_eqdims: [q]i32)
-              (s: i32)
+              (s: i64)
               (queries: [n][d]f32)
-              (nat_leaves :[n]i32)
+              (nat_leaves:*[n]i32)
               (knn_is: *[n][kk]i32)
               (knn_vs: *[n][kk]f32) : (*[n][kk]i32, *[n][kk]f32, i32) =
-  let knns = map2 zip knn_is[: i64.i32 s] knn_vs[: i64.i32 s]
+  let knns = map2 zip knn_is[:s] knn_vs[:s]
   let kd_tree = zip3 median_dims median_vals prev_eqdims
   let (ord_knns, loop_count) =
-    exactKnn ref_pts kd_tree (queries[: i64.i32 s]) (nat_leaves[: i64.i32 s]) knns
+    exactKnn ref_pts kd_tree (queries[:s]) (nat_leaves[:s]) knns
 
   let (knn_inds, knn_dsts) = unzip <| map unzip <| ord_knns
-  let knn_is[: i64.i32 s] = knn_inds
-  let knn_vs[: i64.i32 s] = knn_dsts
+  let knn_is[:s] = knn_inds
+  let knn_vs[:s] = knn_dsts
 
   in (knn_is, knn_vs, loop_count)
 
@@ -321,21 +330,23 @@ let propagate [m][d][nr][nc][k]
               (nat_leaves :[nr][nc]i32)
               (knns: *[nr][nc][k](i32,f32))
             : *[nr][nc][k](i32,f32) =
-  let num_leaves = 1 << (h+1)
-  let ppl = i32.i64 m / num_leaves
-  let flat = flatten ref_pts :> [i64.i32 num_leaves * i64.i32 ppl * d]f32
-  let leaves = unflatten_3d flat
+  let num_leaves = i64.i32 (1 << (h+1))
+  let ppl = m / num_leaves
+  -- let leaves = unflatten num_leaves ppl ref_pts
+  let ref_pts_tmp = ref_pts :> [num_leaves*ppl][d]f32
+  let leaves = unflatten ref_pts_tmp
+
 
   let knns' =
     loop (knns) for im1 < nr-1 do
       let i = im1+1
       let upw_knn_inds = map (map (.0)) (knns[im1])
-      let cur_nodes = copy <| knns[i]
+      let cur_nodes = opaque <| copy <| knns[i]
 
       -- gather leaves from the neighbor directly above:
-      let (n_leavess, to_search_leavess) = unzip <|
+      let (n_leavess, to_search_leavess) = opaque <| unzip <|
         map2(\ (par_inds0: [k]i32) (nat_leaf: i32) : (i32, [k]i32) ->
-                  let par_inds = (copy par_inds0)
+                  let par_inds = opaque (copy par_inds0)
                   let u_leafs = replicate k (-1i32)
                   let n_inds  = 0i32
                   let (n_inds, u_leafs) =
@@ -360,12 +371,12 @@ let propagate [m][d][nr][nc][k]
                   in  (n_inds, u_leafs)
             ) upw_knn_inds (nat_leaves[i])
 
-      let new_knn_row =
+      let new_knn_row = opaque <|
         map4(\ (n_inds: i32) (u_leafs: [k]i32) (knn0: [k](i32,f32)) (query: [d]f32) ->
-                let knn = copy knn0
+                let knn = opaque <| copy knn0
                 in  loop (knn) for q < n_inds do
-                      let leaf_ind = u_leafs[q]
-                      in  bruteForcePar query knn (leaf_ind*ppl, leaves[leaf_ind])
+                      let leaf_ind = u_leafs[opaque(q)]
+                      in  bruteForcePar query knn (leaf_ind * i32.i64 ppl, leaves[leaf_ind])
             ) n_leavess to_search_leavess cur_nodes (queries[i])
 
       let knns[i] = new_knn_row
@@ -400,9 +411,9 @@ let propagate [m][d][nr][nc][k]
 --                    in  bruteForce query knn (leaf_ind*ppl, leaves[leaf_ind])
 --              ) upw_knn_inds (knns[i]) (nat_leaves[i]) (queries[i])
 
-entry propagateFixK [m][kk][d][n] -- Delete [kk] if needed
+entry propagateFixK [m][d][n]
               (h: i32)
-              (nr: i32) -- assumes `nr` equaly divides `n`
+              (nr: i64) -- assumes `nr` equaly divides `n`
               (ref_pts: [m][d]f32)
               (indir:   [m]i32)
               (orig2leaf: [m]i32)
@@ -411,17 +422,14 @@ entry propagateFixK [m][kk][d][n] -- Delete [kk] if needed
               (knn_inds: *[n][kk]i32)
               (knn_dsts: *[n][kk]f32)
             : (*[n][kk]i32, *[n][kk]f32) =
-  let nc = i32.i64 n / nr
-
-  let flat_queries = flatten queries0 :> [i64.i32 nr * i64.i32 nc * d]f32
-  let queries = unflatten_3d flat_queries
-
-  let nat_leaves = unflatten (nat_leaves0 :> [(i64.i32 nr)*(i64.i32 nc)]i32)
-
-  let knns_zip = map2 zip knn_inds knn_dsts
-
-  let flat_knns = flatten knns_zip :> [(i64.i32 nr) * (i64.i32 nc) * kk](i32, f32)
-  let knns = unflatten_3d flat_knns
+  let nc = n / nr
+  
+  -- let queries = unflatten nr nc queries0
+  -- let nat_leaves = unflatten nr nc nat_leaves0
+  -- let knns = unflatten nr nc <| map2 zip knn_inds knn_dsts
+  let queries = unflatten (queries0 :> [nr*nc][d]f32)
+  let nat_leaves = unflatten (nat_leaves0 :> [nr*nc]i32)
+  let knns = unflatten ( (map2 zip knn_inds knn_dsts) :> *[nr*nc][kk](i32,f32) ) 
 
   let knns' = propagate h ref_pts indir orig2leaf queries nat_leaves knns
   let knns_flat' = flatten knns' :> [n][kk](i32,f32)
