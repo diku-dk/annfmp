@@ -1,5 +1,6 @@
 import "lib/github.com/diku-dk/sorts/radix_sort"
 import "util"
+import "rank-k-search"
 
 local let closestLog2 (p: i32) : i32 =
     if p<=1 then 0
@@ -170,10 +171,7 @@ let mkKDtree [m] [d] (height: i32) (q: i64) (m' : i64)
 
 -- ==
 -- compiled input { 4i32 [[1f32],[2f32],[3f32],[4f32],[4f32],[5f32],[6f32],[7f32],[8f32],[8f32],[9f32],[2f32],[3f32],[4f32],[5f32]] }
--- output { 1 2 3 4 5 6 7 8 }
--- Test 2
--- compiled input { 4i32 [[1f32],[2f32],[3f32],[4f32],[4f32],[5f32],[6f32],[7f32],[8f32],[8f32],[9f32],[2f32],[3f32],[4f32],[5f32]] }
--- output { 1 2 3 4 5 6 7 8 }
+-- output { 1 3 16 [[1f32],[2f32],[2f32],[3f32],[3f32],[4f32],[4f32],[4f32],[5f32],[5f32],[6f32],[7f32],[8f32],[8f32],[9f32],[f32.inf]] [0i32,1i32,11i32,2i32,12i32,3i32,4i32,13i32,5i32,14i32,6i32,7i32,8i32,9i32,10i32,15i32] [0, 0, 0] [4.5f32, 3f32, 7.5f32] [-1, 0, 0] }
 let main [m][d] (defppl: i32) (input: [m][d]f32) =
     let (height, num_inner_nodes, _ppl, m') = computeTreeShape (i32.i64 m) defppl
     let (leafs, indir, median_dims, median_vals, clanc_eqdim) =
