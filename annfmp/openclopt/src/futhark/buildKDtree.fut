@@ -63,6 +63,10 @@ local let findClosestMed [n] (cur_dim: i32) (median_dims: [n]i32) (node_ind: i32
 --         3. the index of the dimension that is split
 --         4. the median value of the split dimension
 --         5. the closest ancestor node index that splits the same dimension (or -1 if none)
+
+-- mkKDtree takes a set of points, pads them to fit a complete KD-tree,
+-- repeatedly sorts node point chunks by the widest dimension,
+-- and returns both the reordered leaf layout and the per-node split metadata needed to represent the KD-tree.
 let mkKDtree [m] [d] (height: i32) (q: i64) (m' : i64)
                      (input: [m][d]f32) :
            (*[m'][d]f32, *[m']i32, *[q]i32, *[q]f32, *[q]i32) =
@@ -77,9 +81,10 @@ let mkKDtree [m] [d] (height: i32) (q: i64) (m' : i64)
          let ubs = map (reduce_comm f32.max f32.lowest ) inputT |> opaque
          let lubs = lbs ++ ubs
 
+        -- no padding needed at this point.
          let num_pads = m' - m
          let input' = input ++ (replicate num_pads (replicate d f32.inf)) :> [m'][d]f32
-         let indir  = (map (\x -> i32.i64 x) (iota m'))
+         let indir  = (map (\x -> i32.i64 x) (iota m')) -- should be m
 
          let median_vals = replicate q 0.0f32
          let median_dims = replicate q (-1i32)
@@ -95,12 +100,18 @@ let mkKDtree [m] [d] (height: i32) (q: i64) (m' : i64)
                 , clanc_eqdim: *[q]i32 )
              for lev < (height+1) do
                let nodes_this_lvl = 1i64 << i64.i32 lev
-               let pts_per_node_at_lev = m' / nodes_this_lvl
+               let pts_per_node_at_lev = m' / nodes_this_lvl -- should be m
                let indir2d = unflatten (indir :> [nodes_this_lvl*pts_per_node_at_lev]i32)
 
                -- compute the dimensions to be split for each node at this level
                -- and also the index of the closest ancestor that has split the
                -- same dimension
+
+               -- For each node:
+               -- compute current bounds by walking ancestor decisions via updateBounds
+               -- compute spread in each dimension
+               -- choose the dimension with maximum spread
+               -- find closest ancestor with same dimension using findClosestMed
                let (med_dims, anc_same_med) =
                     map (\ (i: i32) ->
                             let node_ind = i + i32.i64 nodes_this_lvl - 1
@@ -120,6 +131,8 @@ let mkKDtree [m] [d] (height: i32) (q: i64) (m' : i64)
                     --|> intrinsics.opaque
 
                -- sort the choosen dimension for each node
+               -- For each node chunk, grab only the coordinate values in the split dimension.
+               -- So if a node splits on dimension 2, it extracts the 2nd coordinate of each point in that node.
                let chosen_columns = map2 (\indir_chunk dim ->
                                             map (\ind -> input'[ind, dim]
                                                 ) indir_chunk
@@ -130,6 +143,7 @@ let mkKDtree [m] [d] (height: i32) (q: i64) (m' : i64)
                     |> map (radix_sort_float_by_key (\(l,_) -> l) f32.num_bits f32.get_bit)
                     |> map unzip |> unzip
 
+                -- Debug check that median values exist only on one side of the split.
                 let _ =
                     if pts_per_node_at_lev >= 2 then
                         let mi = pts_per_node_at_lev / 2
@@ -140,11 +154,19 @@ let mkKDtree [m] [d] (height: i32) (q: i64) (m' : i64)
                         in if any_bad then trace true else false
                     else false
 
+                -- The split value is the midpoint between the two middle sorted coordinates.
+                --     points before mi go left
+                --     points from mi onward go right
+                --     the split plane is halfway between the two center values
+
                let med_vals = map  (\sorted_dim ->
                                         let mi = pts_per_node_at_lev/2
                                         in (sorted_dim[mi] + sorted_dim[mi-1])/2
                                    ) sorted_dim_2d
 
+                -- This applies the sort permutation to the actual point indices.
+                -- So after this, each node chunk is sorted by the chosen split dimension.
+                -- Because the chunks are contiguous, the left half and right half naturally become the two child subtrees for the next level.
                let indir2d' = map2(\ indir_chunk sort_inds ->
                                         map (\ind -> indir_chunk[ind]) sort_inds
                                   ) indir2d sort_inds_2d

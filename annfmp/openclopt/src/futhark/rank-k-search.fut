@@ -97,7 +97,7 @@ def rankSearchBatch [m][n] (meds: [m]f32) (ks: [m]i32)
         let II1' = scatter II1_bak scat_inds II1
         let II1''= II1'[:tot_len]
         let A''  = A'[:tot_len]
-        
+
         in  (ks', shp', II1'', II1, A'', A, q+1, res')
   in res
 
@@ -125,7 +125,12 @@ let main [m][n] (ass: [m][n]f32) =
     computeMedianWithRankK ass
 
 
-
+-- ==
+-- compiled input { [11,9,16] [2,3,4] [3,5,7] [1,1,1,2,2,2,2,2,3,3,3,3,3,3,3] [5,10,17,3,6,9,12,15,4,8,12,16,20,24,28] }
+-- output { [11f32, 12f32, 85f32] }
+let main [m][n] (meds: [m]f32) (ks: [m]i32)
+                            (shp: [m]i32) (II1: *[n]i32) (A: *[n]f32) : [m]f32 =
+    rankSearchBatch meds ks shp II1 A
 
 
 
@@ -135,7 +140,7 @@ let main [m][n] (ass: [m][n]f32) =
 -- def imap  as f = map f as
 
 -- Functions from DPP notes
--- def mkFlagArray 't [m] 
+-- def mkFlagArray 't [m]
 --             (aoa_shp: [m]i32) (zero: t)
 --             (aoa_val: [m]t  ) : []t =
 --   let shp_scn = scan (+) 0 aoa_shp
@@ -176,25 +181,25 @@ let main [m][n] (ass: [m][n]f32) =
 
 --   -- Since you have many different segments you want to know the indicies of the current segment.
 --   --  You therefore add the exclusive scaned shape array elem to the start of each segment of tfs
-  
+
 --   let exc_scan_shp = ( [0i64] ++ (map (\i -> i64.i32 i) scan_shp[:(p - 1)]) ) :> [p]i64           -- [0,0,0,3,3,7]
 
---   let isT_segments = 
+--   let isT_segments =
 --       let tfs_add_shp      = map (\ind -> tfs[ind] + (i32.i64 ind)) exc_scan_shp                  --[0,0,0,4,4,8]
 --       let tfs_with_seg_val = scatter (copy tfs) (exc_scan_shp) tfs_add_shp                        --[0,1,0,4,0,1,0,8,0,1,0,1]
 --       in sgmscan (+) 0 shp_flag_arr tfs_with_seg_val                                              --[0,1,1,4,4,5,5,8,8,9,9,10]
 
---   let isT_segments_last_elem = map2 (\ind s -> if s == 0 then -1 else isT_segments[ind-1]) 
---                                                                       scan_shp shp :> [p]i32      -- [-1,-1,1,-1,5,10]   
+--   let isT_segments_last_elem = map2 (\ind s -> if s == 0 then -1 else isT_segments[ind-1])
+--                                                                       scan_shp shp :> [p]i32      -- [-1,-1,1,-1,5,10]
 --   let isT_ind = map2 (\off s -> if s == -1 then -1 else off) exc_scan_shp isT_segments_last_elem  -- [-1,-1,0,-1,3,7]
 --   let isF_segments =
---       let ffs_add_Ts       = map2 (\ind t_val -> ffs[ind] + t_val) 
+--       let ffs_add_Ts       = map2 (\ind t_val -> ffs[ind] + t_val)
 --                                             exc_scan_shp isT_segments_last_elem                   -- [0,0,2,2,5,10]
---       let ffs_with_seg_val = scatter (copy ffs) (isT_ind) ffs_add_Ts                              -- [2,0,1,5, 1,0,1,10,1,0,1,0] 
+--       let ffs_with_seg_val = scatter (copy ffs) (isT_ind) ffs_add_Ts                              -- [2,0,1,5, 1,0,1,10,1,0,1,0]
 --       in sgmscan (+) 0 shp_flag_arr ffs_with_seg_val
 
 --   let inds = map3 (\c iT iF -> if c    then i64.i32(iT -1)
 --                                        else i64.i32(iF -1)
 --                   ) mask isT_segments isF_segments
 --   let r =  scatter (replicate n dummy) inds flat_arr
---   in (r, splits) 
+--   in (r, splits)
