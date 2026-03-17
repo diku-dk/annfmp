@@ -108,7 +108,7 @@ let mkKDtree [m] [d] (height: i32) (q: i64) (m' : i64)
                -- same dimension
 
                -- For each node:
-               -- compute current bounds by walking ancestor decisions via updateBounds
+               -- compute current bounds by replaying all parent split choices to see what region the node lives in with updateBounds
                -- compute spread in each dimension
                -- choose the dimension with maximum spread
                -- find closest ancestor with same dimension using findClosestMed
@@ -130,7 +130,6 @@ let mkKDtree [m] [d] (height: i32) (q: i64) (m' : i64)
                     |> unzip
                     --|> intrinsics.opaque
 
-               -- sort the choosen dimension for each node
                -- For each node chunk, grab only the coordinate values in the split dimension.
                -- So if a node splits on dimension 2, it extracts the 2nd coordinate of each point in that node.
                let chosen_columns = map2 (\indir_chunk dim ->
@@ -138,32 +137,25 @@ let mkKDtree [m] [d] (height: i32) (q: i64) (m' : i64)
                                                 ) indir_chunk
                                          ) indir2d med_dims
 
+               -----------THIS SHOULD BE CHANGED TO RANK K SEARCH AND PARTITION2L----------
+               ---------- NO NEED TO SORT -----------
+               -- sort the choosen dimension for each node
                let (sorted_dim_2d, sort_inds_2d) =
                     map2 zip chosen_columns (replicate nodes_this_lvl (iota pts_per_node_at_lev))
                     |> map (radix_sort_float_by_key (\(l,_) -> l) f32.num_bits f32.get_bit)
                     |> map unzip |> unzip
 
-                -- Debug check that median values exist only on one side of the split.
-                let _ =
-                    if pts_per_node_at_lev >= 2 then
-                        let mi = pts_per_node_at_lev / 2
-                        let boundary_eq =
-                            map (\sorted_dim -> sorted_dim[mi-1] == sorted_dim[mi])
-                                sorted_dim_2d
-                        let any_bad = reduce (||) false boundary_eq
-                        in if any_bad then trace true else false
-                    else false
-
+                ---------- THE SPLIT VALUE SHOULD BE FOUND WITH RANK K SEARCH ----------
                 -- The split value is the midpoint between the two middle sorted coordinates.
                 --     points before mi go left
                 --     points from mi onward go right
                 --     the split plane is halfway between the two center values
-
                let med_vals = map  (\sorted_dim ->
                                         let mi = pts_per_node_at_lev/2
                                         in (sorted_dim[mi] + sorted_dim[mi-1])/2
                                    ) sorted_dim_2d
 
+                ---------- NOT NEEDED WHEN USING PARTITION2L ------------
                 -- This applies the sort permutation to the actual point indices.
                 -- So after this, each node chunk is sorted by the chosen split dimension.
                 -- Because the chunks are contiguous, the left half and right half naturally become the two child subtrees for the next level.
