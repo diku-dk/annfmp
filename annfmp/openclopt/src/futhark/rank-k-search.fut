@@ -1,3 +1,5 @@
+import "util"
+
 def log2 x = (loop (y,c) = (x,0i32) while y > 1i32 do (y >> 1, c+1)).1
 
 def imap2 as bs f = map2 f as bs
@@ -101,28 +103,38 @@ def rankSearchBatch [m][n] (meds: [m]f32) (ks: [m]i32)
         in  (ks', shp', II1'', II1, A'', A, q+1, res')
   in res
 
+def computeMedianWithRankK [m] [n] (shp: [m]i32) (input: [n]f32)= 
+  let offsets = exScan (+) 0 (map i64.i32 shp)                                  -- [0, 1]
+  let flagArray = scatter (replicate n 0i64) offsets (map (\_ -> 1i64) shp)    -- [1, 1, 0, 0]
+  let II1 = scan (+) 0i64 flagArray                                                -- [1, 2, 2, 2]
+  
+  -- Calculating mins 
+  let scanned_mins = sgmscan f32.min f32.highest (map i32.i64 flagArray) input
+  let mins_inds = map2 (\off len -> off + len - 1) offsets (map i64.i32 shp)
+  let mins = map (\i -> scanned_mins[i]) mins_inds
 
-def computeMedianWithRankK [m][n] (ass: [m][n]f32) =
-    let mins = map (reduce_comm f32.min f32.highest) ass
-    let maxs = map (reduce_comm f32.max f32.lowest ) ass
-    let means = map2 (+) mins maxs |> map (/ 2) |> opaque
+  -- Calculating maxs
+  let scanned_maxs = sgmscan f32.max f32.lowest (map i32.i64 flagArray) input
+  let maxs_inds = map2 (\off len -> off + len - 1) offsets (map i64.i32 shp)
+  let maxs = map (\i -> scanned_maxs[i]) maxs_inds
+  
+  -- Calculating means
+  let means = map2 (\min max -> (min + max) / 2) mins maxs --|> opague 
+  
+  -- Calculate ks
+  let ks = map (\ x -> i32.f32 (f32.floor ((f32.i32 x) / 2f32))) shp
 
-    let k  = i32.i64 (n / 2)
-    let ks = replicate m k
-    let N  = m * n
-    let shp = replicate m (i32.i64 n)
+  -- 
+  let A = copy input
+  let med_vals = rankSearchBatch means ks shp (map i32.i64 II1) A
+  in med_vals
 
-    -- II1 should in principle be computed with (mkII1 shp)
-    let II1 = (tabulate_2d m n (\i _j -> i32.i64 i + 1) |> flatten) :> *[N]i32
-    let A = copy (flatten ass) :> *[N]f32
-    let medians = rankSearchBatch means ks shp II1 A
-    in medians
 
 -- ==
 -- compiled input { [[11f32, 1f32, 5f32, 20f32], [9f32, 54f32, 12f32, 2f32], [85f32, 59f32, 1857f32, 3f32]] }
 -- output { [11f32, 12f32, 85f32] }
-let main [m][n] (ass: [m][n]f32) =
-    computeMedianWithRankK ass
+-- let main [m][n] (ass: [m][n]f32) =
+--     computeMedianWithRankK ass
 
 
 -- ==
@@ -132,74 +144,3 @@ let main [m][n] (meds: [m]f32) (ks: [m]i32)
                             (shp: [m]i32) (II1: *[n]i32) (A: *[n]f32) : [m]f32 =
     rankSearchBatch meds ks shp II1 A
 
-
-
-
--- def iota32 n = (0..1..<i32.i64 n) :> [n]i32
-
--- def imap  as f = map f as
-
--- Functions from DPP notes
--- def mkFlagArray 't [m]
---             (aoa_shp: [m]i32) (zero: t)
---             (aoa_val: [m]t  ) : []t =
---   let shp_scn = scan (+) 0 aoa_shp
---   let aoa_len = shp_scn[m-1]
---   let shp_ind = imap2 aoa_shp (indices aoa_shp)
---                       (\ s i ->
---                          if s==0 then -1i64
---                          else if i==0 then 0i64
---                          else i64.i32 shp_scn[i-1]
---                       )
---   let flags = scatter (replicate (i64.i32 aoa_len) zero)
---                       shp_ind aoa_val
---   in flags
-
--- def sgmscan 't [n] (op: t->t->t) (ne: t)
---                    (flg : [n]i32) (arr : [n]t) : [n]t =
---   let flgs_vals =
---       scan ( \ (f1, x1) (f2,x2) ->
---               let f = f1 | f2 in
---               if f2 != 0 then (f, x2)
---               else (f, op x1 x2) )
---             (0,ne) (zip flg arr)
---   let (_, vals) = unzip flgs_vals
---   in vals
-
--- def partition3L2 't [n] [p]
---         (mask : [n]bool) -- mask[i] == True => associated predicate holds on elem i              [f,t,f,t,f,t,f,t,f,t,f,t]
---         (shp_flag_arr: [n]i32)                                                                -- [1,0,0,1,0,0,0,1,0,0,0,0]
---         (scan_shp: [p]i32)                                                                    --     [0,0,3,3,7,12]
---         (shp : [p]i32, flat_arr : [n]t) -- representation of an irregular array of array      -- shp:[0,0,3,0,4,5]
---         (dummy : t)
---       : ([n]t, [p]i32) = -- result: the flat array reorganized & splitting point of each segment
-
---   let ffs = map (\f -> if f then 0 else 1) mask                                                   -- [1,0,1,0,1,0,1,0,1,0,1,0]
---   let tfs = map (\f -> if f then 1 else 0) mask                                               -- [0,1,0,1,0,1,0,1,0,1,0,1]
---   let isT = sgmscan (+) 0 shp_flag_arr tfs                                                    -- [0,1,1,1,1,2,2,1,1,2,2,3]
---   let splits = map2 (\s off -> if s == 0 then 0 else isT[off-1]) shp scan_shp :> [p]i32       -- [1,2,3]
-
---   -- Since you have many different segments you want to know the indicies of the current segment.
---   --  You therefore add the exclusive scaned shape array elem to the start of each segment of tfs
-
---   let exc_scan_shp = ( [0i64] ++ (map (\i -> i64.i32 i) scan_shp[:(p - 1)]) ) :> [p]i64           -- [0,0,0,3,3,7]
-
---   let isT_segments =
---       let tfs_add_shp      = map (\ind -> tfs[ind] + (i32.i64 ind)) exc_scan_shp                  --[0,0,0,4,4,8]
---       let tfs_with_seg_val = scatter (copy tfs) (exc_scan_shp) tfs_add_shp                        --[0,1,0,4,0,1,0,8,0,1,0,1]
---       in sgmscan (+) 0 shp_flag_arr tfs_with_seg_val                                              --[0,1,1,4,4,5,5,8,8,9,9,10]
-
---   let isT_segments_last_elem = map2 (\ind s -> if s == 0 then -1 else isT_segments[ind-1])
---                                                                       scan_shp shp :> [p]i32      -- [-1,-1,1,-1,5,10]
---   let isT_ind = map2 (\off s -> if s == -1 then -1 else off) exc_scan_shp isT_segments_last_elem  -- [-1,-1,0,-1,3,7]
---   let isF_segments =
---       let ffs_add_Ts       = map2 (\ind t_val -> ffs[ind] + t_val)
---                                             exc_scan_shp isT_segments_last_elem                   -- [0,0,2,2,5,10]
---       let ffs_with_seg_val = scatter (copy ffs) (isT_ind) ffs_add_Ts                              -- [2,0,1,5, 1,0,1,10,1,0,1,0]
---       in sgmscan (+) 0 shp_flag_arr ffs_with_seg_val
-
---   let inds = map3 (\c iT iF -> if c    then i64.i32(iT -1)
---                                        else i64.i32(iF -1)
---                   ) mask isT_segments isF_segments
---   let r =  scatter (replicate n dummy) inds flat_arr
---   in (r, splits)

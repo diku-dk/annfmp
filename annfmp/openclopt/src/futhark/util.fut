@@ -3,9 +3,14 @@ let log2 x = (loop (y,c) = (x,0i32) while y > 1i32 do (y >> 1, c+1)).1
 def iota32 n = (0..1..<i32.i64 n) :> [n]i32
 
 def imap  as f = map f as
-def imap2 as bs f = map2 f as bs
+def imap2 as bs f = map2 f as bs   
 
 def ones [q] 't (_xs: [q]t) = replicate q 1i32
+
+let exScan 't [n]
+  (op: t -> t -> t) (neutral: t) (xs: [n]t) : [n]t =
+  let inc = scan op neutral xs
+  in map (\i -> if i == 0 then neutral else inc[i-1]) (iota n)
 
 def sgmscan 't [n] (op: t->t->t) (ne: t)
                    (flg : [n]i32) (arr : [n]t) : [n]t =
@@ -33,6 +38,11 @@ def mkFlagArray 't [m]
   let flags = scatter (replicate (i64.i32 aoa_len) zero)
                       shp_ind aoa_val
   in flags
+
+let mkII1 [m] (shp: [m]i32) : *[]i32 =
+    let flags = mkFlagArray shp 0i8 (replicate m 1i8)
+    in  map i32.i8 flags
+     |> scan (+) 0i32
 
 let partition2Ind [n] (cs: [n]bool) : ([n]i32, i32) =
     let tfs = map (\f -> if f then 1 else 0) cs

@@ -12,6 +12,7 @@ local let closestLog2 (p: i32) : i32 =
          in  if err_down <= err_upwd
              then res else res+1
 
+-- SHOULD PROBABLY BE REDEFINED TO GIVE TREE SHAPE FROM HEIGHT INSTEAD
 -- m: the number of reference points
 -- defppl: the default number of points per leaf
 -- result: (height of tree without leaves, number of points per leaf)
@@ -76,19 +77,32 @@ let mkKDtree [m] [d] (height: i32) (q: i64) (m' : i64)
 --                                       , reduce f32.max f32.lowest  row) )
 --                          |> unzip
 
+         -- EVERYTHING HAS TO BE A FLAT ARRAY
+         -- IT SHOULD BE FLAT BEFORE THE LOOP
+         -- IF WE PAD AT THE END, THEN WE CAN RETURN A REGULAR SIZED ARRAY
+         -- We should know about shape in order to use rank k search
+         -- We might need a variable here outside the loop, that can continuously be modified
+         -- based on the current level of the tree.
+         -- Maybe it should have length equal to the final amount of leaves and then just
+         -- be sliced whenever it's given to rank k search function?
+
+         -- Initial bounds used to calculate highest spread dimension.
          let inputT = transpose input
          let lbs = map (reduce_comm f32.min f32.highest) inputT |> opaque
          let ubs = map (reduce_comm f32.max f32.lowest ) inputT |> opaque
          let lubs = lbs ++ ubs
 
-        -- no padding needed at this point.
-         let num_pads = m' - m
-         let input' = input ++ (replicate num_pads (replicate d f32.inf)) :> [m'][d]f32
-         let indir  = (map (\x -> i32.i64 x) (iota m')) -- should be m
-
+         -- Initializations
+         let indir       = (map (\x -> i32.i64 x) (iota m')) -- should be m
+         let num_leaves  = 1 << height
+         let flat_input  = flatten input
+         let shp         = [m']
+         let II1         = replicate m' -1i32
          let median_vals = replicate q 0.0f32
          let median_dims = replicate q (-1i32)
          let clanc_eqdim = replicate q (-1i32)
+         
+         -- Loop
          let ( indir' : *[m']i32
              , median_dims': *[q]i32
              , median_vals': *[q]f32
@@ -100,13 +114,14 @@ let mkKDtree [m] [d] (height: i32) (q: i64) (m' : i64)
                 , clanc_eqdim: *[q]i32 )
              for lev < (height+1) do
                let nodes_this_lvl = 1i64 << i64.i32 lev
-               let pts_per_node_at_lev = m' / nodes_this_lvl -- should be m
-               let indir2d = unflatten (indir :> [nodes_this_lvl*pts_per_node_at_lev]i32)
+               let avg_pts_per_node_at_lev = m' / nodes_this_lvl -- should be m
+               
+               -- cannot be instantiated bc it would be irregular:
+            --    let indir2d = unflatten (indir :> [nodes_this_lvl*avg_pts_per_node_at_lev]i32) 
 
                -- compute the dimensions to be split for each node at this level
                -- and also the index of the closest ancestor that has split the
                -- same dimension
-
                -- For each node:
                -- compute current bounds by replaying all parent split choices to see what region the node lives in with updateBounds
                -- compute spread in each dimension
@@ -131,17 +146,30 @@ let mkKDtree [m] [d] (height: i32) (q: i64) (m' : i64)
                     --|> intrinsics.opaque
 
                -- For each node chunk, grab only the coordinate values in the split dimension.
-               -- So if a node splits on dimension 2, it extracts the 2nd coordinate of each point in that node.
-               let chosen_columns = map2 (\indir_chunk dim ->
-                                            map (\ind -> input'[ind, dim]
-                                                ) indir_chunk
-                                         ) indir2d med_dims
+               -- So if a specific node splits on dimension 2, it extracts the 2nd coordinate of each point in that one node.
+               -- this needs to be changed
 
-               -----------THIS SHOULD BE CHANGED TO RANK K SEARCH AND PARTITION2L----------
+               -- This creates the segment ids for chosen_columns
+               -- For instance shp = [1i64, 3i64] makes seg_ids become [0, 1, 1, 1]
+               let offsets = exScan (+) 0 shp                                                   -- [0, 1]
+               let total = reduce (+) 0i64 shp                                                  -- 4
+               let flagArray = scatter (replicate total 0i64) offsets (map (\_ -> 1i64) shp)    -- [1, 1, 0, 0]
+               let II1 = scan (+) 0i64 flagArray                                                -- [1, 2, 2, 2]
+               let seg_ids = map (\x -> x - 1) II1                                              -- [0, 1, 1, 1]
+               
+               let chosen_columns = map2 (\ind seg ->
+                                            input[ind, med_dims[seg]]
+                                      ) indir seg_ids
+
+               let medians = computeMedianWithRankK shp chosen_columns
+               
+
+
+               -----------THIS SHOULD BE CHANGED TO PARTITION2L----------
                ---------- NO NEED TO SORT -----------
                -- sort the choosen dimension for each node
                let (sorted_dim_2d, sort_inds_2d) =
-                    map2 zip chosen_columns (replicate nodes_this_lvl (iota pts_per_node_at_lev))
+                    map2 zip chosen_columns (replicate nodes_this_lvl (iota pts_per_node_at_lev)) -- change
                     |> map (radix_sort_float_by_key (\(l,_) -> l) f32.num_bits f32.get_bit)
                     |> map unzip |> unzip
 
