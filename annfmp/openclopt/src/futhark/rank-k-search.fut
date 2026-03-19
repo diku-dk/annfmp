@@ -103,20 +103,17 @@ def rankSearchBatch [m][n] (meds: [m]f32) (ks: [m]i32)
         in  (ks', shp', II1'', II1, A'', A, q+1, res')
   in res
 
-def computeMedianWithRankK [m] [n] (shp: [m]i32) (input: [n]f32)= 
-  let offsets = exScan (+) 0 (map i64.i32 shp)                                  -- [0, 1]
-  let flagArray = scatter (replicate n 0i64) offsets (map (\_ -> 1i64) shp)    -- [1, 1, 0, 0]
-  let II1 = scan (+) 0i64 flagArray                                                -- [1, 2, 2, 2]
-  
-  -- Calculating mins 
+def computeMedianWithRankK [m] [n] (shp: [m]i64) (input: [n]f32) (offsets: [m]i64) (flagArray: [n]i64) (II1: [n]i64) = 
+  let shp = map i32.i64 shp
+  -- Calculating mins
   let scanned_mins = sgmscan f32.min f32.highest (map i32.i64 flagArray) input
   let mins_inds = map2 (\off len -> off + len - 1) offsets (map i64.i32 shp)
-  let mins = map (\i -> scanned_mins[i]) mins_inds
+  let mins = map (\i -> if i == -1 then 0 else scanned_mins[i]) mins_inds
 
   -- Calculating maxs
   let scanned_maxs = sgmscan f32.max f32.lowest (map i32.i64 flagArray) input
   let maxs_inds = map2 (\off len -> off + len - 1) offsets (map i64.i32 shp)
-  let maxs = map (\i -> scanned_maxs[i]) maxs_inds
+  let maxs = map (\i -> if i == -1 then 0 else scanned_maxs[i]) maxs_inds
   
   -- Calculating means
   let means = map2 (\min max -> (min + max) / 2) mins maxs --|> opague 
@@ -124,8 +121,11 @@ def computeMedianWithRankK [m] [n] (shp: [m]i32) (input: [n]f32)=
   -- Calculate ks
   let ks = map (\ x -> i32.f32 (f32.floor ((f32.i32 x) / 2f32))) shp
 
-  -- 
   let A = copy input
+  -- Means [0.0, 4.0, 9.4, 7.3]
+  -- ks  
+  -- II1 [1, 1, 1, 2, 2, 2, 3, 3, 3]
+  -- A [4.0, 4.0, 4.0, 9.4, 9.4, 9.4, 7.3, 7.3, 7.3]
   let med_vals = rankSearchBatch means ks shp (map i32.i64 II1) A
   in med_vals
 

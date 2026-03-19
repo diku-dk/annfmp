@@ -83,13 +83,13 @@ let main =
     -- let oneArray = map (\_ -> 1i32) shp
     
     -- let flagArray = mkFlagArray (map i32.i64 shp) 0 oneArray
-    let scanned_mins = sgmscan f32.min f32.highest (map i32.i64 start_flags) chosen_columns
-    let mins_inds = map2 (\off len -> off + len - 1) offsets shp
-    let mins = map (\i -> scanned_mins[i]) mins_inds
+    -- let scanned_mins = sgmscan f32.min f32.highest (map i32.i64 start_flags) chosen_columns
+    -- let mins_inds = map2 (\off len -> off + len - 1) offsets shp
+    -- let mins = map (\i -> scanned_mins[i]) mins_inds
 
-    let scanned_maxs = sgmscan f32.max f32.lowest (map i32.i64 start_flags) chosen_columns
-    let maxs_inds = map2 (\off len -> off + len - 1) offsets shp
-    let maxs = map (\i -> scanned_maxs[i]) maxs_inds
+    -- let scanned_maxs = sgmscan f32.max f32.lowest (map i32.i64 start_flags) chosen_columns
+    -- let maxs_inds = map2 (\off len -> off + len - 1) offsets shp
+    -- let maxs = map (\i -> scanned_maxs[i]) maxs_inds
     
     -- Calculating means
     -- let means = map2 (\min max -> (min + max) / 2) mins maxs --|> opague 
@@ -106,10 +106,41 @@ let main =
     -- let A = copy chosen_columns
     -- let med_vals = rankSearchBatch means ks (map i32.i64 shp) II1 A
     -- let _ = trace med_vals
-    let chosenbob = [11.0, 12.0, 1857.0, 17.0]
+    -- let chosenbob = [11.0, 1857.0, 17.0, 12.0]
 
-    let gimme = computeMedWithRankK (map i32.i64 shp) chosenbob
-    let _ = trace gimme
+    -- let (medians, offsets, flagArray) = computeMedianWithRankK (map i32.i64 shp) chosenbob
+    -- let _ = trace gimme
+   -- offsets [0, 1]
+   -- flagarray [1, 1, 0, 0]
+ 
+    -- DO TOMORROW -> [11.0, 17.0, 17.0, 17.0] (maybe)
+    -- make bool array 
+    -- test partition2L with indir
+    -- scatter indir onto
+    -- Compare all elements in chosenbob with their median using the shape OR using the offsets
+    -- let bools = map2 (\flag element -> if flag == 1 then medInd++
+    --                                    ) flagarray chosenbob
+    -- let II1 = scan (+) 0i64 flagArray                                                -- [1, 2, 2, 2]
+    -- let seg_ids = map (\x -> x - 1) II1 
+    -- let bools = map2 (\x seg -> x < medians[seg]) chosenbob seg_ids
+    -- let _ = trace bools
 
-    in gimme
+
+
+    -- let indir = iota 4
+    -- let gimme = partition2L bools 0i64 (shp, indir)
+    -- let _ = trace gimme
+
+
+    -- Update shp
+    -- shp = [3, 5] -> shp' = [1, 2, 4, 1]
+    -- splitInds = [1, 4]
+    -- shp' = 1, 3-1, 4, 5-4
+    -- shp' = zip
+    
+    let shp = [3i64, 5i64]
+    let splitInds = [1i64, 4i64]
+    let shp' = map2 (\len ind -> [ind] ++ [len - ind]) shp splitInds |> flatten
+    let _ = trace shp'
+    in shp'
 
