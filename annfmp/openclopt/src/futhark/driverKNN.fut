@@ -144,11 +144,11 @@ entry selectBestNN [n][w1][w2][h1][h2][c] -- Remove [kk] if errors occur...
 
 entry buildKDtree [m][d] (defppl: i32) (input: [m][d]f32) =
     let (height, num_inner_nodes, ppl, m') = computeTreeShape (i32.i64 m) defppl
-    let (leafs, indir, median_dims, median_vals, clanc_eqdim) =
-          mkKDtree height (i64.i32 num_inner_nodes) (i64.i32 m') input
+    let (leafs, shp, indir, median_dims, median_vals, clanc_eqdim) =
+          mkKDtree height (i64.i32 num_inner_nodes) input
     let orig2leaf = scatter (replicate (i64.i32 m') (-1i32)) (map i64.i32 indir)
                             (map (\i -> i / ppl) (map i32.i64 (iota (i64.i32 m'))))
-    in  (height, num_inner_nodes, m', leafs, indir, orig2leaf, median_dims, median_vals, clanc_eqdim)
+    in  (height, shp num_inner_nodes, m', leafs, indir, orig2leaf, median_dims, median_vals, clanc_eqdim)
 
 --------------------------------------------------------------
 --- Finding the natural leaf to which the query belongs to ---

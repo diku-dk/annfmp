@@ -72,7 +72,6 @@ let mkKDtree [m] [d] (height: i32) (q: i64)
                      (input: [m][d]f32) :
            (*[m][d]f32, *[1i64 << (i64.i32 height + 1i64)]i64, *[m]i32, *[q]i32, *[q]f32, *[q]i32) =
 
-    -- IF WE PAD AT THE END, THEN WE CAN RETURN A REGULAR SIZED ARRAY
     -- We should know about shape in order to use rank k search
     -- We might need a variable here outside the loop, that can continuously be modified
     -- based on the current level of the tree.
