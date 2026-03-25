@@ -142,13 +142,22 @@ entry selectBestNN [n][w1][w2][h1][h2][c] -- Remove [kk] if errors occur...
 --
 -- compiled random input { 256i32 [2097152][7]f32 }
 
-entry buildKDtree [m][d] (defppl: i32) (input: [m][d]f32) =
-    let (height, num_inner_nodes, ppl, m') = computeTreeShape (i32.i64 m) defppl
+-- entry buildKDtree [m][d] (defppl: i32) (input: [m][d]f32) =
+--     let (height, num_inner_nodes, ppl, m') = computeTreeShape (i32.i64 m) defppl
+--     let (leafs, shp, indir, median_dims, median_vals, clanc_eqdim) =
+--           mkKDtree height (i64.i32 num_inner_nodes) input
+--     let orig2leaf = scatter (replicate (i64.i32 m') (-1i32)) (map i64.i32 indir)
+--                             (map (\i -> i / ppl) (map i32.i64 (iota (i64.i32 m'))))
+--     in  (height, shp num_inner_nodes, m', leafs, indir, orig2leaf, median_dims, median_vals, clanc_eqdim)
+
+entry buildKDtreeFlat [m][d] (height: i32) (input: [m][d]f32) =
+    let num_inner_nodes = (1 << (height+1)) - 1
     let (leafs, shp, indir, median_dims, median_vals, clanc_eqdim) =
           mkKDtree height (i64.i32 num_inner_nodes) input
-    let orig2leaf = scatter (replicate (i64.i32 m') (-1i32)) (map i64.i32 indir)
-                            (map (\i -> i / ppl) (map i32.i64 (iota (i64.i32 m'))))
-    in  (height, shp num_inner_nodes, m', leafs, indir, orig2leaf, median_dims, median_vals, clanc_eqdim)
+    let (_, _, II1) = (computeOffsetsFlagsII1 m (i64.i32 num_inner_nodes + 1) shp)
+    let seg_ids = map (\x -> x - 1) II1
+    let orig2leaf = scatter (replicate m (-1i32)) (map i64.i32 indir) (map i32.i64 seg_ids)
+    in  (height, shp, num_inner_nodes, m, leafs, indir, orig2leaf, median_dims, median_vals, clanc_eqdim)
 
 --------------------------------------------------------------
 --- Finding the natural leaf to which the query belongs to ---
@@ -245,16 +254,18 @@ let exactKnnOld [m][q][d][n][k]
           in  (queries', knns'', new_leaves', new_stacks', new_dists', ord_knns', query_inds', i+1, n'')
   in  (ord_knns', loop_count)
 
-let exactKnn [m][q][d][n][k]
+let exactKnnSeg [m][q][d][n][k]
               (ref_pts: [m][d]f32)
+              (shp: [q+1]i64)
               (kd_tree: [q](i32,f32,i32))
               (queries: [n][d]f32)
               (nat_leaves: *[n]i32)
               (knns:   *[n][k](i32,f32)) : (*[n][k](i32,f32), i32) =
-  let (h, ppl, num_leaves) = getHeightPpl (i32.i64 q) (i32.i64 m)
+  -- let (h, ppl, num_leaves) = getHeightPpl (i32.i64 q) (i32.i64 m)
   -- let leaves = unflatten num_leaves ppl ref_pts
-  let ref_pts_tmp = ref_pts :> [num_leaves*ppl][d]f32
-  let leaves = unflatten ref_pts_tmp
+  -- let ref_pts_tmp = ref_pts :> [num_leaves*ppl][d]f32
+  -- let leaves = unflatten ref_pts_tmp
+  let leaf_offsets = exScan (+) 0i64 shp
 
   let last_leaves = nat_leaves
   let stacks = replicate n 0i32
@@ -277,8 +288,10 @@ let exactKnn [m][q][d][n][k]
           let knns' = map3 (\query knn leaf_ind ->
                               -- let knn = intrinsics.opaque <| copy knn0
                               let count = if leaf_ind < i32.i64 num_leaves then 1i32 else 0i32
+                              let beg = leaf_offsets[leaf_ind]
+                              let len = shp[leaf_ind]
                               in  loop (knn) for _j < count do
-                                      bruteForcePar query knn (leaf_ind * i32.i64 ppl, leaves[leaf_ind])
+                                      bruteForceSegPar query knn beg len ref_pts
                            ) queries knns new_leaves
                     |> opaque
 
@@ -298,7 +311,7 @@ entry exactKnnFixK [m][q][d][n]
   let knns = map2 zip knn_is[:s] knn_vs[:s]
   let kd_tree = zip3 median_dims median_vals prev_eqdims
   let (ord_knns, loop_count) =
-    exactKnn ref_pts kd_tree (queries[:s]) (nat_leaves[:s]) knns
+    exactKnnSeg ref_pts kd_tree (queries[:s]) (nat_leaves[:s]) knns
 
   let (knn_inds, knn_dsts) = unzip <| map unzip <| ord_knns
   let knn_is[:s] = knn_inds
