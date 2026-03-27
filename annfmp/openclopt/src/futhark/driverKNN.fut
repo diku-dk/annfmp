@@ -265,6 +265,7 @@ let exactKnnSeg [m][q][d][n][k]
   -- let leaves = unflatten num_leaves ppl ref_pts
   -- let ref_pts_tmp = ref_pts :> [num_leaves*ppl][d]f32
   -- let leaves = unflatten ref_pts_tmp
+  let (h, _, num_leaves) = getHeightPpl (i32.i64 q) (i32.i64 m)
   let leaf_offsets = exScan (+) 0i64 shp
 
   let last_leaves = nat_leaves
@@ -303,6 +304,7 @@ entry exactKnnFixK [m][q][d][n]
               (median_dims: [q]i32)
               (median_vals: [q]f32)
               (prev_eqdims: [q]i32)
+              (shp: [q+1]i64)
               (s: i64)
               (queries: [n][d]f32)
               (nat_leaves:*[n]i32)
@@ -311,7 +313,7 @@ entry exactKnnFixK [m][q][d][n]
   let knns = map2 zip knn_is[:s] knn_vs[:s]
   let kd_tree = zip3 median_dims median_vals prev_eqdims
   let (ord_knns, loop_count) =
-    exactKnnSeg ref_pts kd_tree (queries[:s]) (nat_leaves[:s]) knns
+    exactKnnSeg ref_pts shp kd_tree (queries[:s]) (nat_leaves[:s]) knns
 
   let (knn_inds, knn_dsts) = unzip <| map unzip <| ord_knns
   let knn_is[:s] = knn_inds
@@ -334,20 +336,22 @@ let estimateIndex [m] (n_rows: i32) (n_cols: i32)
   let cand_leaf_ind = orig2leaf[orig_cand_ind]
   in  cand_leaf_ind
 
-let propagate [m][d][nr][nc][k]
-              (h: i32)
+let propagate [m][d][nr][nc][k][q]
+              --(h: i32)
               (ref_pts:   [m][d]f32)
+              (shp: [q]i64)
               (indir:     [m]i32)
               (orig2leaf: [m]i32)
               (queries: [nr][nc][d]f32)
               (nat_leaves :[nr][nc]i32)
               (knns: *[nr][nc][k](i32,f32))
             : *[nr][nc][k](i32,f32) =
-  let num_leaves = i64.i32 (1 << (h+1))
-  let ppl = m / num_leaves
+  -- let num_leaves = q+1
+  -- let ppl = m / num_leaves
+  let leaf_offsets = exScan (+) 0i64 shp
   -- let leaves = unflatten num_leaves ppl ref_pts
-  let ref_pts_tmp = ref_pts :> [num_leaves*ppl][d]f32
-  let leaves = unflatten ref_pts_tmp
+  -- let ref_pts_tmp = ref_pts :> [m][d]f32
+  -- let leaves = unflatten ref_pts_tmp
 
 
   let knns' =
@@ -389,7 +393,10 @@ let propagate [m][d][nr][nc][k]
                 let knn = opaque <| copy knn0
                 in  loop (knn) for q < n_inds do
                       let leaf_ind = u_leafs[opaque(q)]
-                      in  bruteForcePar query knn (leaf_ind * i32.i64 ppl, leaves[leaf_ind])
+                      let beg = leaf_offsets[i64.i32 leaf_ind]
+                      let len = shp[i64.i32 leaf_ind]
+                      in bruteForceSegPar query knn beg len ref_pts
+                      -- in  bruteForcePar query knn (leaf_ind * i32.i64 ppl, leaves[leaf_ind])
             ) n_leavess to_search_leavess cur_nodes (queries[i])
 
       let knns[i] = new_knn_row
@@ -424,10 +431,11 @@ let propagate [m][d][nr][nc][k]
 --                    in  bruteForce query knn (leaf_ind*ppl, leaves[leaf_ind])
 --              ) upw_knn_inds (knns[i]) (nat_leaves[i]) (queries[i])
 
-entry propagateFixK [m][d][n]
-              (h: i32)
+entry propagateFixK [m][d][n][q]
+              --(h: i32)
               (nr: i64) -- assumes `nr` equaly divides `n`
               (ref_pts: [m][d]f32)
+              (shp: [q]i64)
               (indir:   [m]i32)
               (orig2leaf: [m]i32)
               (queries0: [n][d]f32)
@@ -444,7 +452,7 @@ entry propagateFixK [m][d][n]
   let nat_leaves = unflatten (nat_leaves0 :> [nr*nc]i32)
   let knns = unflatten ( (map2 zip knn_inds knn_dsts) :> *[nr*nc][kk](i32,f32) ) 
 
-  let knns' = propagate h ref_pts indir orig2leaf queries nat_leaves knns
+  let knns' = propagate ref_pts shp indir orig2leaf queries nat_leaves knns
   let knns_flat' = flatten knns' :> [n][kk](i32,f32)
   let (knn_inds', knn_dsts') = unzip <| map unzip knns_flat'
 

@@ -81,10 +81,10 @@ let bruteForceSegPar [m][d][k] (query: [d]f32)
                          (knn0: [k](i32,f32))
                          (beg: i64)
                          (len: i64)
-                         (ref_pts: *[m][d]f32)
+                         (ref_pts: [m][d]f32)
                        : [k](i32,f32) =
-  let B = 256i64
-  let refs = ref_pts[beg:beg+len]
+  let B = len / 4 
+  let refs = copy ref_pts[beg:beg+len]
   let knn = copy knn0
 --  let diststmp = map (sumSqrsSeq query) refs -- euclidian distances
 --  let dists = diststmp :> [len]f32 
@@ -99,7 +99,7 @@ let bruteForceSegPar [m][d][k] (query: [d]f32)
           for i < (len + B - 1)/B do
             let pt_idx = i * B + li
             in if pt_idx < len
-              then let dis = sumSqrsSeq query refs[beg + pt_idx]
+              then let dis = sumSqrsSeq query refs[pt_idx]
                 in if dis < mval then (pt_idx, dis) else (midx, mval)
               else (midx, mval)
           ) |> reduce_comm (\ (i1,v1) (i2,v2) -> if v1 <= v2 then (i1,v1) else (i2,v2)) (len, f32.inf)
