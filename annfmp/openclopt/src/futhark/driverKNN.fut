@@ -5,6 +5,9 @@ import "brute-force"
 import "kd-traverse"
 import "util"
 
+def imapintra f as = 
+  #[incremental_flattening(only_intra)] map3 f as
+
 let sortQueriesByLeavesRadix [n] (num_bits: i32) (leaves: [n]i32) : ([n]i32, [n]i32) =
   unzip <| radix_sort_by_key (\(l,_) -> l) num_bits i32.get_bit (zip leaves (map i32.i64 (iota n)))
 
@@ -254,9 +257,14 @@ let exactKnnOld [m][q][d][n][k]
           in  (queries', knns'', new_leaves', new_stacks', new_dists', ord_knns', query_inds', i+1, n'')
   in  (ord_knns', loop_count)
 
-let exactKnnSeg [m][q][d][n][k]
+-- exactKnnSeg [[3.0,8.0,5.0],[2.0,4.0,2.0],[1.0,1.0,3.0],[1.0,2.0,3.0]] [3,3] 
+-- ([0,1,0,1],[1.0,2.0,3.0,1.0],[0,1,2,0]) [[1.0,4.0,5.0],[1.0,4.0,5.0]] [0,0] [(0,1.0),(1,2.0)]
+
+-- exactKnnSeg [[3.0f32, 8.0f32, 5.0f32], [2.0f32, 4.0f32, 2.0f32], [1.0f32, 1.0f32, 3.0f32], [1.0f32, 2.0f32, 3.0f32]] [3i64, 3i64, 3i64, 3i64, 0i64] [(0i32, 1.0f32, 0i32), (1i32, 2.0f32, 1i32), (0i32, 3.0f32, 2i32), (1i32, 1.0f32, 0i32)] [[1.0f32, 4.0f32, 5.0f32], [1.0f32, 4.0f32, 5.0f32]] [0i32, 0i32] [[(0i32, 1.0f32), (1i32, 2.0f32)], [(0i32, 1.0f32), (1i32, 2.0f32)]]
+
+let exactKnnSeg [m][q][d][n][k][p]
               (ref_pts: [m][d]f32)
-              (shp: [q+1]i64)
+              (shp: [p]i64)
               (kd_tree: [q](i32,f32,i32))
               (queries: [n][d]f32)
               (nat_leaves: *[n]i32)
@@ -266,7 +274,9 @@ let exactKnnSeg [m][q][d][n][k]
   -- let ref_pts_tmp = ref_pts :> [num_leaves*ppl][d]f32
   -- let leaves = unflatten ref_pts_tmp
   let (h, _, num_leaves) = getHeightPpl (i32.i64 q) (i32.i64 m)
+  let _ = trace num_leaves
   let leaf_offsets = exScan (+) 0i64 shp
+  let avg_leafsize = (reduce (+) 0i64 shp) / length(shp)
 
   let last_leaves = nat_leaves
   let stacks = replicate n 0i32
@@ -286,25 +296,25 @@ let exactKnnSeg [m][q][d][n][k]
                  |> opaque
 
           -- do brute force
-          let knns' = map3 (\query knn leaf_ind ->
+          let knns' = imapintra (\query knn leaf_ind ->
                               -- let knn = intrinsics.opaque <| copy knn0
                               let count = if leaf_ind < i32.i64 num_leaves then 1i32 else 0i32
                               let beg = leaf_offsets[leaf_ind]
                               let len = shp[leaf_ind]
                               in  loop (knn) for _j < count do
-                                      bruteForceSegPar query knn beg len ref_pts
+                                      bruteForceSegPar query knn beg len avg_leafsize ref_pts
                            ) queries knns new_leaves
                     |> opaque
 
           in  (knns', new_leaves, new_stacks, new_dists, i+1, i64.i32 n'')
   in  (ord_knns', loop_count)
 
-entry exactKnnFixK [m][q][d][n]
+entry exactKnnFixK [m][q][d][n][p]
               (ref_pts: [m][d]f32)
               (median_dims: [q]i32)
               (median_vals: [q]f32)
               (prev_eqdims: [q]i32)
-              (shp: [q+1]i64)
+              (shp: [p]i64)
               (s: i64)
               (queries: [n][d]f32)
               (nat_leaves:*[n]i32)
@@ -349,6 +359,7 @@ let propagate [m][d][nr][nc][k][q]
   -- let num_leaves = q+1
   -- let ppl = m / num_leaves
   let leaf_offsets = exScan (+) 0i64 shp
+  let avg_leafsize = (reduce (+) 0i64 shp) / length(shp)
   -- let leaves = unflatten num_leaves ppl ref_pts
   -- let ref_pts_tmp = ref_pts :> [m][d]f32
   -- let leaves = unflatten ref_pts_tmp
@@ -395,7 +406,7 @@ let propagate [m][d][nr][nc][k][q]
                       let leaf_ind = u_leafs[opaque(q)]
                       let beg = leaf_offsets[i64.i32 leaf_ind]
                       let len = shp[i64.i32 leaf_ind]
-                      in bruteForceSegPar query knn beg len ref_pts
+                      in bruteForceSegPar query knn beg len avg_leafsize ref_pts
                       -- in  bruteForcePar query knn (leaf_ind * i32.i64 ppl, leaves[leaf_ind])
             ) n_leavess to_search_leavess cur_nodes (queries[i])
 

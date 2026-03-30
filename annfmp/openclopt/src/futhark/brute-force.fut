@@ -77,42 +77,48 @@ let bruteForcePar [m][d][k] (query: [d]f32)
 def imapintra as f = 
   #[incremental_flattening(only_intra)] map f as
 
+-- bruteForceSegPar [1.0,4.0,5.0] [(0,1.0),(1,2.0),(2,9.0),(3,5.0)] 0 4 4 [[3.0,8.0,5.0],[2.0,4.0,2.0],[1.0,1.0,3.0],[1.0,2.0,3.0]]
+
 let bruteForceSegPar [m][d][k] (query: [d]f32)
                          (knn0: [k](i32,f32))
                          (beg: i64)
                          (len: i64)
+                         (avg_leafsize: i64)
                          (ref_pts: [m][d]f32)
                        : [k](i32,f32) =
-  let B = len / 4 
-  let refs = copy ref_pts[beg:beg+len]
+  let B = avg_leafsize
+  -- let refs = copy ref_pts[beg:beg+len]
   let knn = copy knn0
+  let visited = replicate k (-1i64) 
 --  let diststmp = map (sumSqrsSeq query) refs -- euclidian distances
 --  let dists = diststmp :> [len]f32 
   let cycle = true
   let j = 0i32
   let (_, knn, _, _) =
-    loop (refs, knn, j, cycle)
+    loop (visited, knn, j, cycle)
       while cycle && (j < (i32.i64 k)) do
         let (min_ind, min_val) =
-          imapintra (iota B) (\li ->
+          map (\li ->
           loop (midx, mval) = (len, f32.inf)
           for i < (len + B - 1)/B do
             let pt_idx = i * B + li
-            in if pt_idx < len
-              then let dis = sumSqrsSeq query refs[pt_idx]
+            let seen = loop found = false for vi < k do
+                           found || (visited[vi] == pt_idx)
+            in if pt_idx < len && !seen
+              then let dis = sumSqrsSeq query ref_pts[beg + pt_idx]
                 in if dis < mval then (pt_idx, dis) else (midx, mval)
               else (midx, mval)
-          ) |> reduce_comm (\ (i1,v1) (i2,v2) -> if v1 <= v2 then (i1,v1) else (i2,v2)) (len, f32.inf)
+          ) (iota B) |> reduce_comm (\ (i1,v1) (i2,v2) -> if v1 <= v2 then (i1,v1) else (i2,v2)) (len, f32.inf)
 --          reduce_comm (\ (i1,v1) (i2,v2) ->
 --                        if v1 < v2 then (i1, v1) else
 --                        if v1 > v2 then (i2, v2) else
 --                        (if i1 <= i2 then i1 else i2, v1)
 --                      ) (len, f32.inf) (zip (iota len) dists)
         in  if min_val < (knn[k-1-(i64.i32 j)].1)
-            then  let refs[min_ind] = replicate d f32.highest
+            then  let visited[i64.i32 j] = min_ind
                   let knn[k-1-(i64.i32 j)] = (i32.i64 beg + i32.i64 min_ind, min_val)
-                  in  (refs, knn, j+1, true)
-            else  (refs, knn, j, false)
+                  in  (visited, knn, j+1, true)
+            else  (visited, knn, j, false)
   let knn_sort = sortPartSortedSeqs knn
   in  knn_sort
 
