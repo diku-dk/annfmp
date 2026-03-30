@@ -19,7 +19,7 @@ let kk = 8i64
 ---------------
 --- Helpers ---
 ---------------
-def ilog2 (n: i32) : i32 = (63 - i32.clz n)
+def ilog2 (n: i32) : i32 = (31 - i32.clz n)
 
 let getHeightPpl (q: i32) (m: i32) : (i32, i64, i64) =
   let num_nodes  = q
@@ -165,27 +165,30 @@ entry buildKDtreeFlat [m][d] (height: i32) (input: [m][d]f32) =
 --------------------------------------------------------------
 --- Finding the natural leaf to which the query belongs to ---
 --------------------------------------------------------------
-let findNaturalLeaves [m][d][q][n] (k: i64)
+let findNaturalLeaves [m][d][q][p][n] (k: i64)
                                 (ref_pts:  [m][d]f32)
+                                (shp: [p]i64)
                                 (median_dims: [q]i32)
                                 (median_vals: [q]f32)
                                 (queries:  [n][d]f32) :
                                 (*[n][k]i32, *[n][k]f32, *[n]i32) =
-  let (h, ppl, num_leaves) = getHeightPpl (i32.i64 q) (i32.i64 m)
+  let h = ilog2 (i32.i64 (p)) -1
   
-  let ref_pts_tmp = ref_pts :> [num_leaves*ppl][d]f32
-  let leaves = unflatten ref_pts_tmp
-
+  let leaf_offsets = exScan (+) 0i64 shp
+  let avg_leafsize = (reduce (+) 0i64 shp) / length(shp)
 
   let query_leaves0 = map (findLeaf median_dims median_vals h) queries
   let (query_leaves, query_inds) = sortQueriesByLeavesRadix (h+1) query_leaves0
   let queries = gather2D queries query_inds
-  let knns0 = map2(\leaf_ind query -> bruteForce query (replicate k (-1i32, f32.highest))
-                                                  (leaf_ind * i32.i64 ppl, leaves[leaf_ind])
-                  ) query_leaves queries
-  -- let dummy = replicate n (replicate (i64.i32 k) (-1i32, f32.highest))
-  -- let knns0' = scatter2D dummy query_inds knns0
-  -- let (knn_inds, knn_vals) = unzip <| map unzip knns0'
+
+  let knns0 = map2 (\leaf_ind query ->
+                      let beg = leaf_offsets[leaf_ind]
+                      let len = shp[leaf_ind]
+                      in  bruteForceSegPar query
+                          (replicate k (-1i32, f32.highest))
+                          beg len avg_leafsize ref_pts
+                    ) query_leaves queries
+
   let dummy_inds = replicate n (replicate k (-1i32))
   let dummy_vals = replicate n (replicate k f32.highest)
   let (knns0_inds, knns0_vals) = unzip <| map unzip knns0
@@ -193,13 +196,14 @@ let findNaturalLeaves [m][d][q][n] (k: i64)
   let knn_vals = scatter2D dummy_vals query_inds knns0_vals
   in  (knn_inds, knn_vals, query_leaves0)
 
-entry findNaturalLeavesFixK [m][d][q][n]
+entry findNaturalLeavesFixK [m][d][q][p][n]
                           (ref_pts:  [m][d]f32)
+                          (shp: [p]i64)
                           (median_dims: [q]i32)
                           (median_vals: [q]f32)
                           (queries: [n][d]f32) :
                           (*[n][kk]i32, *[n][kk]f32, *[n]i32) =
-  findNaturalLeaves kk ref_pts median_dims median_vals queries
+  findNaturalLeaves kk ref_pts shp median_dims median_vals queries
 
 -----------------------------
 --- Finding the exact knn ---

@@ -144,3 +144,19 @@ let main =
     let _ = trace shp'
     in shp'
 
+    -- NaturalLeaves test:))
+    let ref_pts = [[1.3f32, 4.7f32], [5.2f32, 7.9f32], [9.1f32, 3.6f32], [2.4f32, 8.8f32], [6.5f32, 1.2f32], [7.7f32, 5.5f32], [3.3f32, 9.9f32], [8.8f32, 2.1f32], [4.4f32, 6.6f32], [0.9f32, 3.3f32], [2.2f32, 7.7f32], [5.5f32, 8.1f32], [9.9f32, 0.4f32], [1.1f32, 2.8f32], [6.8f32, 4.2f32], [7.3f32, 9.0f32], [3.7f32, 1.5f32], [8.1f32, 6.3f32], [4.9f32, 2.2f32], [0.6f32, 7.4f32], [2.5f32, 5.8f32], [9.2f32, 8.6f32], [1.7f32, 3.9f32], [6.0f32, 4.5f32], [7.8f32, 0.7f32], [3.1f32, 9.4f32], [5.9f32, 6.2f32], [2.9f32, 5.1f32], [2.9f32, 5.1f32], [2.9f32, 5.1f32], [2.9f32, 5.1f32], [2.9f32, 5.1f32]]
+
+    let median_dims = [1i32, 0i32, 0i32, 0i32, 1i32, 1i32, 0i32]
+    let median_vals = [5.1f32, 6.0f32, 3.1f32, 1.7f32, 2.1f32, 5.1f32, 5.9f32]
+    let queries = [[5f32, 6f32], [3f32, 9f32], [1f32, 4f32], [8f32, 6f32]]
+
+    let shp = [3i64, 3i64, 3i64, 4i64, 0i64, 9i64, 5i64, 5i64]
+
+    let (knn_inds, knn_vals, query_leaves0) = findNaturalLeaves 8i64 ref_pts shp median_dims median_vals queries
+
+    let _ = trace knn_inds
+    let _ = trace knn_vals
+    let _ = trace query_leaves0
+
+    in knn_inds
