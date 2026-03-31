@@ -338,6 +338,7 @@ entry exactKnnFixK [m][q][d][n][p]
 ------------------------------
 --- Propagatingation Phase ---
 ------------------------------
+-- This is hopefully an unneeded helper function soon
 let estimateIndex [m] (n_rows: i32) (n_cols: i32)
                   (indir: [m]i32) (orig2leaf: [m]i32)
                   (par_ind: i32) : i32 =
@@ -350,6 +351,76 @@ let estimateIndex [m] (n_rows: i32) (n_cols: i32)
   let cand_leaf_ind = orig2leaf[orig_cand_ind]
   in  cand_leaf_ind
 
+-- flat version not using nr or nc or estimateIndex (Daniel)
+let DANpropagate [m][d][p][n][k]
+              (ref_pts:   [m][d]f32)
+              (shp:       [p]i64)
+              (orig2leaf: [m]i32)
+              (queries:   [n][d]f32)
+              (nat_leaves:[n]i32)
+              (knns: *[n][k](i32,f32))
+            : *[n][k](i32,f32) =
+  let leaf_offsets = exScan (+) 0i64 shp
+  let avg_leafsize = (reduce (+) 0i64 shp) / length(shp)
+
+  let knns' =
+    loop (knns) for im1 < n-1 do
+      let i = im1 + 1
+      let upw_knn_inds = map (.0) knns[im1]
+      let cur_knn = opaque <| copy knns[i]
+      let nat_leaf = nat_leaves[i]
+      let query = queries[i]
+
+      let u_leafs = replicate k (-1i32)
+      let n_inds = 0i32
+
+      let (n_inds, u_leafs) =
+        loop (n_inds, u_leafs) for q < k do
+          -- Why not just get the parent leaf directly?
+          let par_leaf = orig2leaf[upw_knn_inds[q]]
+          let (_, not_found) =
+            loop (j, not_found) = (0i32, par_leaf != nat_leaf)
+              while not_found && j < n_inds do
+                if u_leafs[j] == par_leaf
+                then (j, false)
+                else (j+1, true)
+          in if not_found
+             then let u_leafs[n_inds] = par_leaf
+                  in (n_inds + 1, u_leafs)
+             else (n_inds, u_leafs)
+
+      let new_knn =
+        loop (knn) = (cur_knn) for q < n_inds do
+          let leaf_ind = u_leafs[q]
+          let beg = leaf_offsets[leaf_ind]
+          let len = shp[leaf_ind]
+          in bruteForceSegPar query knn beg len avg_leafsize ref_pts
+
+      let knns[i] = new_knn
+      in knns
+
+  in knns'
+
+-- flat version not using nr or nc (Daniel)
+entry DANpropagateFixK [m][d][p][n]
+              (ref_pts: [m][d]f32)
+              (shp:     [p]i64)
+              (indir:   [m]i32)
+              (orig2leaf: [m]i32)
+              (queries: [n][d]f32)
+              (nat_leaves :[n]i32)
+              (knn_inds: *[n][kk]i32)
+              (knn_dsts: *[n][kk]f32)
+            : (*[n][kk]i32, *[n][kk]f32) =
+  let knns = map2 zip knn_inds knn_dsts
+
+  let knns' = DANpropagate ref_pts shp orig2leaf queries nat_leaves knns
+  let (knn_inds', knn_dsts') = unzip <| map unzip knns'
+
+  let knn_inds'' = map (\kinds -> map (\ind -> indir[ind]) kinds) knn_inds'
+  in (knn_inds'', knn_dsts')
+
+-- Bong version?
 let propagate [m][d][nr][nc][k][q]
               --(h: i32)
               (ref_pts:   [m][d]f32)
@@ -417,34 +488,6 @@ let propagate [m][d][nr][nc][k][q]
       let knns[i] = new_knn_row
       in  knns
   in  knns'
-
---      let new_knn_row =
---          map4(\(par_inds0: [k]i32) (knn0: [k](i32,f32)) (nat_leaf: i32) (query: [d]f32) ->
---                  let par_inds = intrinsics.opaque (copy par_inds0)
---                  let u_leafs = replicate k (-1i32)
---                  let n_inds  = 0i32
---                  let (n_inds, u_leafs) =
---                    loop (n_inds, u_leafs)
---                      for q < k do
---                        let par_ind = par_inds[q] / ppl
---                        let not_found = par_ind != nat_leaf
---                        let j = 0i32
---                        let (_,not_found) =
---                          loop (j,not_found)
---                            while not_found && j < n_inds do
---                              if u_leafs[j] == par_ind
---                              then (j,   false)
---                              else (j+1, true)
---                        in  if not_found
---                            then  let u_leafs[n_inds] = par_ind
---                                  in  (n_inds+1, u_leafs)
---                            else  (n_inds, u_leafs)
---                  let knn = intrinsics.opaque (copy knn0)
---                  in --map2 (\j (i,v) -> (i*u_leafs[j], v*2.0f32)) (iota k) knn
---                  loop (knn) for q < n_inds do
---                    let leaf_ind = u_leafs[q]
---                    in  bruteForce query knn (leaf_ind*ppl, leaves[leaf_ind])
---              ) upw_knn_inds (knns[i]) (nat_leaves[i]) (queries[i])
 
 entry propagateFixK [m][d][n][q]
               --(h: i32)
