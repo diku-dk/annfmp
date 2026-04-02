@@ -19,6 +19,7 @@ class ANNField:
         n_subset=1000,
         algorithm="sklearn",
         leaf_size=64,
+        height=8,
         n_jobs=-1,
         propagate=True,
         select_best_nn=True,
@@ -32,6 +33,7 @@ class ANNField:
         self.n_subset = n_subset
         self.algorithm = algorithm
         self.leaf_size = leaf_size
+        self.height = height
         self.n_jobs = n_jobs
         self.propagate = propagate
         self.select_best_nn = select_best_nn
@@ -49,6 +51,7 @@ class ANNField:
             "n_subset": self.n_subset,
             "algorithm": self.algorithm,
             "leaf_size": self.leaf_size,
+            "height": self.height,
             "n_jobs": self.n_jobs,
             "propagate": self.propagate,
             "select_best_nn": self.select_best_nn,
@@ -123,7 +126,7 @@ class ANNField:
                 psize=self.psize,
                 dim_reduced=self.dim_reduced,
                 n_subset=self.n_subset,
-                leaf_size=self.leaf_size,
+                height=self.height,
                 n_jobs=self.n_jobs,
                 select_best_nn=self.select_best_nn,
                 verbose=self.verbose,

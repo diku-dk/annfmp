@@ -425,7 +425,7 @@ entry propagateFixKDan [m][d][p][n]
             : (*[n][kk]i32, *[n][kk]f32) =
   let knns = map2 zip knn_inds knn_dsts
 
-  let knns' = propagate ref_pts shp orig2leaf queries nat_leaves knns
+  let knns' = propagateDan ref_pts shp orig2leaf queries nat_leaves knns
   let (knn_inds', knn_dsts') = unzip <| map unzip knns'
 
   let knn_inds'' = map (\kinds -> map (\ind -> indir[ind]) kinds) knn_inds'
