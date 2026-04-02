@@ -10,7 +10,6 @@ modelOpencl = ANNField(
     n_neighbors=8,
     psize=8,
     dim_reduced=40,
-    leaf_size=128,
     height=8,
     n_subset=1000,
     algorithm="openclopt",

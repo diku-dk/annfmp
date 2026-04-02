@@ -23,7 +23,6 @@ class ANNFieldPropKDTreeOpenCLOPT:
         psize=8,
         dim_reduced=5,
         n_subset=1000,
-        leaf_size=64,
         height=8,
         n_jobs=-1,
         select_best_nn=True,
@@ -37,7 +36,6 @@ class ANNFieldPropKDTreeOpenCLOPT:
         self.psize = psize
         self.dim_reduced = dim_reduced
         self.n_subset = n_subset
-        self.leaf_size = leaf_size
         self.height = height
         self.n_jobs = n_jobs
         self.select_best_nn = select_best_nn
@@ -102,7 +100,6 @@ class ANNFieldPropKDTreeOpenCLOPT:
             self.psize,
             self.dim_reduced,
             self.n_subset,
-            self.leaf_size,
             self.height,
             self.seed,
             self.platform_id,
