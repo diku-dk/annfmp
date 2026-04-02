@@ -169,7 +169,8 @@ void pair_init(
         int psize,
         int dim_reduced,
         int n_subset,
-        int leaf_size,
+        // int leaf_size,
+		int height,
         int seed,
 		int platform_id,
         int device_id      // input ends
@@ -190,7 +191,8 @@ void pair_init(
 
     params->debug = 1;
 
-    params->leaf_size = leaf_size;
+	params->height = height;
+    //params->leaf_size = leaf_size;
 	params->hImageA = himageA;
 	params->wImageA = wimageA;
 	params->cImage  = cimageA;
@@ -270,7 +272,8 @@ void fit_extern( FUTHARK_CTX_INP *params, int profile ) {
 	const int32_t wImageB = params->wImageB;
 	const int32_t hImageB = params->hImageB;
 	const int32_t cImage  = params->cImage;
-	const int32_t leaf_size = params->leaf_size;
+	//const int32_t leaf_size = params->leaf_size;
+	const int32_t height = params->height;
 	const int32_t kk      = params->kk;
 
 	// creates patches
@@ -278,8 +281,8 @@ void fit_extern( FUTHARK_CTX_INP *params, int profile ) {
 	int n_rows = hImageA - psize + 1;
 
 	if(profile)
-		printf("Number of (rows-cols): (%d,%d), (patch_small, patch_large): (%d, %d), kk: %d, leaf-size:%d\n\n"
-			  , n_rows, n_cols, patch_small, patch_large, kk, leaf_size);
+		printf("Number of (rows-cols): (%d,%d), (patch_small, patch_large): (%d, %d), kk: %d, height:%d\n\n"
+			  , n_rows, n_cols, patch_small, patch_large, kk, height);
 
 	struct futhark_f32_2d* query_pts; //patches_A_reduced;
 	struct futhark_f32_2d* refer_pts; //patches_B_reduced;
@@ -371,7 +374,8 @@ void fit_extern( FUTHARK_CTX_INP *params, int profile ) {
 	}
 #endif
 
-	int32_t height, num_inner_nodes, m_prime;
+	int32_t height_kd, num_inner_nodes, m_prime;
+	struct futhark_i32_1d* shp;
 	struct futhark_f32_2d* leaves;
     struct futhark_i32_1d* indir;
     struct futhark_i32_1d* orig2leaf;
@@ -387,9 +391,9 @@ void fit_extern( FUTHARK_CTX_INP *params, int profile ) {
       	//height, num_inner_nodes, m_pad, leafs, indir, median_dims, median_vals, clanc_eqdim =
       	//		self.futobj_mktree.buildKDtree(256, array_patches_b_reduced)
     	int s1 = futhark_entry_buildKDtree( fut_ctx
-    							 , &height, &num_inner_nodes, &m_prime, &leaves, &indir // output
+    							 , &height_kd, &shp, &num_inner_nodes, &m_prime, &leaves, &indir // output
     							 , &orig2leaf, &median_dims, &median_vals, &clanc_eqdim // output
-    							 , leaf_size, refer_pts // input
+    							 , height, refer_pts // input
     							 );
     	cuCtxSynchronize();
 
@@ -405,9 +409,9 @@ void fit_extern( FUTHARK_CTX_INP *params, int profile ) {
       	}
     } else {
     	futhark_entry_buildKDtree( fut_ctx
-    							 , &height, &num_inner_nodes, &m_prime, &leaves, &indir // output
+    							 , &height_kd, &shp, &num_inner_nodes, &m_prime, &leaves, &indir // output
     							 , &orig2leaf, &median_dims, &median_vals, &clanc_eqdim // output
-    							 , leaf_size, refer_pts // input
+    							 , height, refer_pts // input
     							 );
     	//printf("Default leaf size: %d, actual leaf size: %d\n", leaf_size, m_prime / (1<<(height+1)) );
     }
@@ -449,7 +453,7 @@ void fit_extern( FUTHARK_CTX_INP *params, int profile ) {
 
     	int s1 = futhark_entry_findNaturalLeavesFixK(fut_ctx,
     			&knn_ini_inds, &knn_ini_dsts, &nat_leaves, // output
-            	leaves, median_dims, median_vals, query_pts// input
+            	leaves, shp, median_dims, median_vals, query_pts// input
             );
     	cuCtxSynchronize();
 
@@ -466,7 +470,7 @@ void fit_extern( FUTHARK_CTX_INP *params, int profile ) {
     } else {
     	futhark_entry_findNaturalLeavesFixK(fut_ctx,
     			&knn_ini_inds, &knn_ini_dsts, &nat_leaves, // output
-            	leaves, median_dims, median_vals, query_pts// input
+            	leaves, shp, median_dims, median_vals, query_pts// input
             );
     }
 
@@ -483,7 +487,7 @@ void fit_extern( FUTHARK_CTX_INP *params, int profile ) {
     	//	self.futobj_knn.exactKnnFixK(leafs, median_dims, median_vals, clanc_eqdim, self._n_cols, array_patches_a_reduced, nat_leaves, knn_ini_inds, knn_ini_dsts)
     	int s1 = futhark_entry_exactKnnFixK(fut_ctx,
     			&knn_inds_exact, &knn_dsts_exact, &loop_count, // output
-    			leaves, median_dims, median_vals, clanc_eqdim, n_cols, // input
+    			leaves, median_dims, median_vals, clanc_eqdim, shp, n_cols, // input
                 query_pts, nat_leaves, knn_ini_inds, knn_ini_dsts // input
             );
     	cuCtxSynchronize();
@@ -501,7 +505,7 @@ void fit_extern( FUTHARK_CTX_INP *params, int profile ) {
     } else {
     	futhark_entry_exactKnnFixK(fut_ctx,
     			&knn_inds_exact, &knn_dsts_exact, &loop_count, // output
-    			leaves, median_dims, median_vals, clanc_eqdim, n_cols, // input
+    			leaves, median_dims, median_vals, clanc_eqdim, shp, n_cols, // input
                 query_pts, nat_leaves, knn_ini_inds, knn_ini_dsts // input
             );
     }
@@ -531,7 +535,7 @@ void fit_extern( FUTHARK_CTX_INP *params, int profile ) {
     	// knn_inds, knn_dsts = self.futobj_knn.propagateFixK(height, self._n_rows, leafs, indir, array_patches_a_reduced, nat_leaves, knn_inds_exact, knn_dsts_exact)
     	int s1 = futhark_entry_propagateFixK(fut_ctx,
                 &knn_inds_all, &knn_dsts_all, // output
-                height, n_rows, leaves, indir, orig2leaf, query_pts, // input
+                n_rows, leaves, shp, indir, orig2leaf, query_pts, // input
                 nat_leaves, knn_inds_exact, knn_dsts_exact           // input
             );
     	cuCtxSynchronize();
@@ -549,7 +553,7 @@ void fit_extern( FUTHARK_CTX_INP *params, int profile ) {
     } else {
     	futhark_entry_propagateFixK(fut_ctx,
                 &knn_inds_all, &knn_dsts_all, // output
-                height, n_rows, leaves, indir, orig2leaf, query_pts, // input
+                n_rows, leaves, shp, indir, orig2leaf, query_pts, // input
                 nat_leaves, knn_inds_exact, knn_dsts_exact           // input
             );
     }
@@ -584,6 +588,7 @@ void fit_extern( FUTHARK_CTX_INP *params, int profile ) {
 		s += futhark_free_i32_1d(fut_ctx, orig2leaf);
 		s += futhark_free_i32_1d(fut_ctx, nat_leaves);
 		s += futhark_free_f32_2d(fut_ctx, knn_dsts_all);
+		s += futhark_free_f32_2d(fut_ctx, shp);
 
 		//s += futhark_free_i32_2d(fut_ctx, knn_inds_all);
 

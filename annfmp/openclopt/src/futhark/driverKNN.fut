@@ -302,11 +302,15 @@ let exactKnnSeg [m][q][d][n][k][p]
           -- do brute force
           let knns' = imapintra (\query knn leaf_ind ->
                               -- let knn = intrinsics.opaque <| copy knn0
-                              let count = if leaf_ind < i32.i64 num_leaves then 1i32 else 0i32
-                              let beg = leaf_offsets[leaf_ind]
-                              let len = shp[leaf_ind]
-                              in  loop (knn) for _j < count do
-                                      bruteForceSegPar query knn beg len avg_leafsize ref_pts
+                              if leaf_ind >= 0 && leaf_ind < (i32.i64 p) 
+                              then
+                                let count = if leaf_ind < i32.i64 num_leaves then 1i32 else 0i32
+                                let beg = leaf_offsets[leaf_ind]
+                                let len = shp[leaf_ind]
+                                in  loop (knn) for _j < count do
+                                        bruteForceSegPar query knn beg len avg_leafsize ref_pts
+                              else
+                                knn
                            ) queries knns new_leaves
                     |> opaque
 
@@ -352,7 +356,7 @@ let estimateIndex [m] (n_rows: i32) (n_cols: i32)
   in  cand_leaf_ind
 
 -- flat version not using nr or nc or estimateIndex
-let propagate [m][d][p][n][k]
+let propagateDan [m][d][p][n][k]
               (ref_pts:   [m][d]f32)
               (shp:       [p]i64)
               (orig2leaf: [m]i32)
@@ -409,7 +413,7 @@ let propagate [m][d][p][n][k]
   in knns'
 
 -- flat version not using nr or nc
-entry propagateFixK [m][d][p][n]
+entry propagateFixKDan [m][d][p][n]
               (ref_pts: [m][d]f32)
               (shp:     [p]i64)
               (indir:   [m]i32)
@@ -423,6 +427,105 @@ entry propagateFixK [m][d][p][n]
 
   let knns' = propagate ref_pts shp orig2leaf queries nat_leaves knns
   let (knn_inds', knn_dsts') = unzip <| map unzip knns'
+
+  let knn_inds'' = map (\kinds -> map (\ind -> indir[ind]) kinds) knn_inds'
+  in (knn_inds'', knn_dsts')
+
+
+-- Bong version
+let propagate [m][d][nr][nc][k][q]
+              --(h: i32)
+              (ref_pts:   [m][d]f32)
+              (shp: [q]i64)
+              (indir:     [m]i32)
+              (orig2leaf: [m]i32)
+              (queries: [nr][nc][d]f32)
+              (nat_leaves :[nr][nc]i32)
+              (knns: *[nr][nc][k](i32,f32))
+            : *[nr][nc][k](i32,f32) =
+  -- let num_leaves = q+1
+  -- let ppl = m / num_leaves
+  let leaf_offsets = exScan (+) 0i64 shp
+  let avg_leafsize = (reduce (+) 0i64 shp) / length(shp)
+  -- let leaves = unflatten num_leaves ppl ref_pts
+  -- let ref_pts_tmp = ref_pts :> [m][d]f32
+  -- let leaves = unflatten ref_pts_tmp
+
+
+  let knns' =
+    loop (knns) for im1 < nr-1 do
+      let i = im1+1
+      let upw_knn_inds = map (map (.0)) (knns[im1])
+      let cur_nodes = opaque <| copy <| knns[i]
+
+      -- gather leaves from the neighbor directly above:
+      let (n_leavess, to_search_leavess) = opaque <| unzip <|
+        map2(\ (par_inds0: [k]i32) (nat_leaf: i32) : (i32, [k]i32) ->
+                  let par_inds = opaque (copy par_inds0)
+                  let u_leafs = replicate k (-1i32)
+                  let n_inds  = 0i32
+                  let (n_inds, u_leafs) =
+                    loop (n_inds, u_leafs)
+                      for q < k do
+                        -- let par_ind = par_inds[q] / ppl
+                        let par_ind =
+                          estimateIndex (i32.i64 nr) (i32.i64 nc) indir orig2leaf (par_inds[q])
+
+                        let not_found = par_ind != nat_leaf
+                        let j = 0i32
+                        let (_,not_found) =
+                          loop (j,not_found)
+                            while not_found && j < n_inds do
+                              if u_leafs[j] == par_ind
+                              then (j,   false)
+                              else (j+1, true)
+                        in  if not_found
+                            then  let u_leafs[n_inds] = par_ind
+                                  in  (n_inds+1, u_leafs)
+                            else  (n_inds, u_leafs)
+                  in  (n_inds, u_leafs)
+            ) upw_knn_inds (nat_leaves[i])
+
+      let new_knn_row = opaque <|
+        map4(\ (n_inds: i32) (u_leafs: [k]i32) (knn0: [k](i32,f32)) (query: [d]f32) ->
+                let knn = opaque <| copy knn0
+                in  loop (knn) for q < n_inds do
+                      let leaf_ind = u_leafs[opaque(q)]
+                      let beg = leaf_offsets[i64.i32 leaf_ind]
+                      let len = shp[i64.i32 leaf_ind]
+                      in bruteForceSegPar query knn beg len avg_leafsize ref_pts
+                      -- in  bruteForcePar query knn (leaf_ind * i32.i64 ppl, leaves[leaf_ind])
+            ) n_leavess to_search_leavess cur_nodes (queries[i])
+
+      let knns[i] = new_knn_row
+      in  knns
+  in  knns'
+
+entry propagateFixK [m][d][n][q]
+              --(h: i32)
+              (nr: i64) -- assumes `nr` equaly divides `n`
+              (ref_pts: [m][d]f32)
+              (shp: [q]i64)
+              (indir:   [m]i32)
+              (orig2leaf: [m]i32)
+              (queries0: [n][d]f32)
+              (nat_leaves0 :[n]i32)
+              (knn_inds: *[n][kk]i32)
+              (knn_dsts: *[n][kk]f32)
+            : (*[n][kk]i32, *[n][kk]f32) =
+  let nc = n / nr
+  
+  -- let queries = unflatten nr nc queries0
+  -- let nat_leaves = unflatten nr nc nat_leaves0
+  -- let knns = unflatten nr nc <| map2 zip knn_inds knn_dsts
+  let queries = unflatten (queries0 :> [nr*nc][d]f32)
+  let nat_leaves = unflatten (nat_leaves0 :> [nr*nc]i32)
+  let knns = unflatten ( (map2 zip knn_inds knn_dsts) :> *[nr*nc][kk](i32,f32) ) 
+
+  let knns' = propagate ref_pts shp indir orig2leaf queries nat_leaves knns
+  let knns_flat' = flatten knns' :> [n][kk](i32,f32)
+  let (knn_inds', knn_dsts') = unzip <| map unzip knns_flat'
+
 
   let knn_inds'' = map (\kinds -> map (\ind -> indir[ind]) kinds) knn_inds'
   in (knn_inds'', knn_dsts')
