@@ -98,6 +98,14 @@ int futhark_values_i32_3d(struct futhark_context *ctx, struct futhark_i32_3d *ar
 int futhark_index_i32_3d(struct futhark_context *ctx, int32_t *out, struct futhark_i32_3d *arr, int64_t i0, int64_t i1, int64_t i2);
 CUdeviceptr futhark_values_raw_i32_3d(struct futhark_context *ctx, struct futhark_i32_3d *arr);
 const int64_t *futhark_shape_i32_3d(struct futhark_context *ctx, struct futhark_i32_3d *arr);
+struct futhark_i64_1d;
+struct futhark_i64_1d *futhark_new_i64_1d(struct futhark_context *ctx, const int64_t *data, int64_t dim0);
+struct futhark_i64_1d *futhark_new_raw_i64_1d(struct futhark_context *ctx, CUdeviceptr data, int64_t dim0);
+int futhark_free_i64_1d(struct futhark_context *ctx, struct futhark_i64_1d *arr);
+int futhark_values_i64_1d(struct futhark_context *ctx, struct futhark_i64_1d *arr, int64_t *data);
+int futhark_index_i64_1d(struct futhark_context *ctx, int64_t *out, struct futhark_i64_1d *arr, int64_t i0);
+CUdeviceptr futhark_values_raw_i64_1d(struct futhark_context *ctx, struct futhark_i64_1d *arr);
+const int64_t *futhark_shape_i64_1d(struct futhark_context *ctx, struct futhark_i64_1d *arr);
 struct futhark_u8_2d;
 struct futhark_u8_2d *futhark_new_u8_2d(struct futhark_context *ctx, const uint8_t *data, int64_t dim0, int64_t dim1);
 struct futhark_u8_2d *futhark_new_raw_u8_2d(struct futhark_context *ctx, CUdeviceptr data, int64_t dim0, int64_t dim1);
@@ -112,11 +120,11 @@ const int64_t *futhark_shape_u8_2d(struct futhark_context *ctx, struct futhark_u
 
 
 // Entry points
-int futhark_entry_buildKDtree(struct futhark_context *ctx, int32_t *out0, int32_t *out1, int32_t *out2, struct futhark_f32_2d **out3, struct futhark_i32_1d **out4, struct futhark_i32_1d **out5, struct futhark_i32_1d **out6, struct futhark_f32_1d **out7, struct futhark_i32_1d **out8, const int32_t in0, const struct futhark_f32_2d *in1);
-int futhark_entry_exactKnnFixK(struct futhark_context *ctx, struct futhark_i32_2d **out0, struct futhark_f32_2d **out1, int32_t *out2, const struct futhark_f32_2d *in0, const struct futhark_i32_1d *in1, const struct futhark_f32_1d *in2, const struct futhark_i32_1d *in3, const int64_t in4, const struct futhark_f32_2d *in5, const struct futhark_i32_1d *in6, const struct futhark_i32_2d *in7, const struct futhark_f32_2d *in8);
-int futhark_entry_findNaturalLeavesFixK(struct futhark_context *ctx, struct futhark_i32_2d **out0, struct futhark_f32_2d **out1, struct futhark_i32_1d **out2, const struct futhark_f32_2d *in0, const struct futhark_i32_1d *in1, const struct futhark_f32_1d *in2, const struct futhark_f32_2d *in3);
+int futhark_entry_buildKDtree(struct futhark_context *ctx, int32_t *out0, struct futhark_i64_1d **out1, int32_t *out2, int64_t *out3, struct futhark_f32_2d **out4, struct futhark_i32_1d **out5, struct futhark_i32_1d **out6, struct futhark_i32_1d **out7, struct futhark_f32_1d **out8, struct futhark_i32_1d **out9, const int32_t in0, const struct futhark_f32_2d *in1);
+int futhark_entry_exactKnnFixK(struct futhark_context *ctx, struct futhark_i32_2d **out0, struct futhark_f32_2d **out1, int32_t *out2, const struct futhark_f32_2d *in0, const struct futhark_i32_1d *in1, const struct futhark_f32_1d *in2, const struct futhark_i32_1d *in3, const struct futhark_i64_1d *in4, const int64_t in5, const struct futhark_f32_2d *in6, const struct futhark_i32_1d *in7, const struct futhark_i32_2d *in8, const struct futhark_f32_2d *in9);
+int futhark_entry_findNaturalLeavesFixK(struct futhark_context *ctx, struct futhark_i32_2d **out0, struct futhark_f32_2d **out1, struct futhark_i32_1d **out2, const struct futhark_f32_2d *in0, const struct futhark_i64_1d *in1, const struct futhark_i32_1d *in2, const struct futhark_f32_1d *in3, const struct futhark_f32_2d *in4);
 int futhark_entry_mkImgPatches(struct futhark_context *ctx, struct futhark_u8_2d **out0, const int32_t in0, const struct futhark_i32_3d *in1);
-int futhark_entry_propagateFixK(struct futhark_context *ctx, struct futhark_i32_2d **out0, struct futhark_f32_2d **out1, const int32_t in0, const int64_t in1, const struct futhark_f32_2d *in2, const struct futhark_i32_1d *in3, const struct futhark_i32_1d *in4, const struct futhark_f32_2d *in5, const struct futhark_i32_1d *in6, const struct futhark_i32_2d *in7, const struct futhark_f32_2d *in8);
+int futhark_entry_propagateFixK(struct futhark_context *ctx, struct futhark_i32_2d **out0, struct futhark_f32_2d **out1, const int32_t in0, const struct futhark_f32_2d *in1, const struct futhark_i64_1d *in2, const struct futhark_i32_1d *in3, const struct futhark_i32_1d *in4, const struct futhark_f32_2d *in5, const struct futhark_i32_1d *in6, const struct futhark_i32_2d *in7, const struct futhark_f32_2d *in8);
 int futhark_entry_reducePatchDim(struct futhark_context *ctx, struct futhark_f32_2d **out0, const struct futhark_u8_2d *in0, const struct futhark_f32_2d *in1, const struct futhark_f32_1d *in2);
 int futhark_entry_selectBestNN(struct futhark_context *ctx, struct futhark_i32_1d **out0, struct futhark_f32_1d **out1, float *out2, const int32_t in0, const struct futhark_i32_2d *in1, const struct futhark_i32_3d *in2, const struct futhark_i32_3d *in3);
 int futhark_entry_selectBestNN_BAD(struct futhark_context *ctx, struct futhark_i32_1d **out0, struct futhark_f32_1d **out1, const int32_t in0, const struct futhark_i32_2d *in1, const struct futhark_f32_3d *in2, const struct futhark_f32_3d *in3);

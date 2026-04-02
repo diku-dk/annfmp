@@ -85,8 +85,8 @@ void init_extern(
 	// thresholds for reducePatchDim
 	const char* threshold_reddim_outer = "reducePatchDim.suff_outer_par_0";
 	const char* threshold_reddim_inner = "reducePatchDim.suff_outer_par_1"; //(threshold (!reducePatchDim.suff_outer_par_0))
-	s += futhark_context_config_set_size(fut_ctx_conf, threshold_reddim_outer, 100000000);
-	s += futhark_context_config_set_size(fut_ctx_conf, threshold_reddim_inner, 4);
+	s += futhark_context_config_set_tuning_param(fut_ctx_conf, threshold_reddim_outer, 100000000);
+	s += futhark_context_config_set_tuning_param(fut_ctx_conf, threshold_reddim_inner, 4);
 
 	// thresholds for buildKDtree
 	const char* buildKDT_intra4 = "buildKDtree.suff_intra_par_4"; // (threshold (!buildKDtree.suff_outer_par_3))
@@ -96,47 +96,47 @@ void init_extern(
 	const char* buildKDT_outer2 = "buildKDtree.suff_outer_par_2"; // (threshold ())
 	const char* buildKDT_outer3 = "buildKDtree.suff_outer_par_3"; // (threshold ())
 
-	s += futhark_context_config_set_size(fut_ctx_conf, buildKDT_intra4, 3000000);
-	s += futhark_context_config_set_size(fut_ctx_conf, buildKDT_intra7, 3000000);
-	s += futhark_context_config_set_size(fut_ctx_conf, buildKDT_outer0, 100000000);
-	s += futhark_context_config_set_size(fut_ctx_conf, buildKDT_outer1, 100000000);
-	s += futhark_context_config_set_size(fut_ctx_conf, buildKDT_outer2, 256);
-	s += futhark_context_config_set_size(fut_ctx_conf, buildKDT_outer3, 100000000);
+	s += futhark_context_config_set_tuning_param(fut_ctx_conf, buildKDT_intra4, 3000000);
+	s += futhark_context_config_set_tuning_param(fut_ctx_conf, buildKDT_intra7, 3000000);
+	s += futhark_context_config_set_tuning_param(fut_ctx_conf, buildKDT_outer0, 100000000);
+	s += futhark_context_config_set_tuning_param(fut_ctx_conf, buildKDT_outer1, 100000000);
+	s += futhark_context_config_set_tuning_param(fut_ctx_conf, buildKDT_outer2, 256);
+	s += futhark_context_config_set_tuning_param(fut_ctx_conf, buildKDT_outer3, 100000000);
 
 	// thresholds for exactKnnFixK
 	const char* exactKNN_intra1 = "exactKnnFixK.suff_intra_par_1"; // (threshold (!exactKnnFixK.suff_outer_par_0))
 	const char* exactKNN_outer0 = "exactKnnFixK.suff_outer_par_0"; // (threshold ())
 
-	s += futhark_context_config_set_size(fut_ctx_conf, exactKNN_intra1, 16); //2048);         // 16
-	s += futhark_context_config_set_size(fut_ctx_conf, exactKNN_outer0, 100000000); //256);  // 100000000
+	s += futhark_context_config_set_tuning_param(fut_ctx_conf, exactKNN_intra1, 16); //2048);         // 16
+	s += futhark_context_config_set_tuning_param(fut_ctx_conf, exactKNN_outer0, 100000000); //256);  // 100000000
 
-//	s += futhark_context_config_set_size(fut_ctx_conf, exactKNN_intra1, 2048);         // 16
-//	s += futhark_context_config_set_size(fut_ctx_conf, exactKNN_outer0, 256);  // 100000000
+//	s += futhark_context_config_set_tuning_param(fut_ctx_conf, exactKNN_intra1, 2048);         // 16
+//	s += futhark_context_config_set_tuning_param(fut_ctx_conf, exactKNN_outer0, 256);  // 100000000
 
 
 	// thresholds for propagateFixK
 	const char* threshold_propagate_intra= "propagateFixK.suff_intra_par_3";
 	const char* threshold_propagate_outer= "propagateFixK.suff_outer_par_2";
-	s += futhark_context_config_set_size(fut_ctx_conf, threshold_propagate_outer, 100000000); //256);  // 100000000
-	s += futhark_context_config_set_size(fut_ctx_conf, threshold_propagate_intra, 16); //2048);   // 16
+	s += futhark_context_config_set_tuning_param(fut_ctx_conf, threshold_propagate_outer, 100000000); //256);  // 100000000
+	s += futhark_context_config_set_tuning_param(fut_ctx_conf, threshold_propagate_intra, 16); //2048);   // 16
 
-//	s += futhark_context_config_set_size(fut_ctx_conf, threshold_propagate_outer, 256);  // 100000000
-//	s += futhark_context_config_set_size(fut_ctx_conf, threshold_propagate_intra, 2048);   // 16
+//	s += futhark_context_config_set_tuning_param(fut_ctx_conf, threshold_propagate_outer, 256);  // 100000000
+//	s += futhark_context_config_set_tuning_param(fut_ctx_conf, threshold_propagate_intra, 2048);   // 16
 
 
 
 	// thresholds for selectBestNN
 	//const char* threshold_selectbest_intra = "selectBestNN.suff_intra_par_1";
 	//const char* threshold_selectbest_outer = "selectBestNN.suff_outer_par_0";
-	//s += futhark_context_config_set_size(fut_ctx_conf, threshold_selectbest_outer, 100000000);
-	//s += futhark_context_config_set_size(fut_ctx_conf, threshold_selectbest_intra, 16);
+	//s += futhark_context_config_set_tuning_param(fut_ctx_conf, threshold_selectbest_outer, 100000000);
+	//s += futhark_context_config_set_tuning_param(fut_ctx_conf, threshold_selectbest_intra, 16);
 	//selectBestNN.suff_outer_par_2 (threshold (!selectBestNN.suff_outer_par_0 !selectBestNN.suff_intra_par_1))
 
-	// Cosmin: fixed the bug by hand by modifying by hand the cuda generated code;
+	// Cosmin: fixed the bug by hand by modifying by hand the cuda generated code; FIXTHIS
 	//		   this is a nasty bug, it will probably take a while to fix in Futhark.
-	const char* filename = "../annfmp/openclopt/src/futhark/kernels.cu";
+	// const char* filename = "../annfmp/openclopt/src/futhark/kernels.cu";
 	//futhark_context_config_dump_program_to(fut_ctx_conf, filename);
-	futhark_context_config_load_program_from(fut_ctx_conf, filename);
+	// futhark_context_config_load_program_from(fut_ctx_conf, filename);
 
 	// creating a new context must happen AFTER all the
 	// context configuration parameters have been set!!!
@@ -415,17 +415,17 @@ void fit_extern( FUTHARK_CTX_INP *params, int profile ) {
     							 );
     	//printf("Default leaf size: %d, actual leaf size: %d\n", leaf_size, m_prime / (1<<(height+1)) );
     }
-	int32_t *c_median_dimensions = (int32_t*)malloc(num_inner_nodes * sizeof(int32_t));
-	float *c_median_values = (float*)malloc(num_inner_nodes * sizeof(float));
-	futhark_values_i32_1d(fut_ctx, median_dims, c_median_dimensions);
-	futhark_values_f32_1d(fut_ctx, median_vals, c_median_values);
+	// int32_t *c_median_dimensions = (int32_t*)malloc(num_inner_nodes * sizeof(int32_t));
+	// float *c_median_values = (float*)malloc(num_inner_nodes * sizeof(float));
+	// futhark_values_i32_1d(fut_ctx, median_dims, c_median_dimensions);
+	// futhark_values_f32_1d(fut_ctx, median_vals, c_median_values);
 
-	for (size_t i = 0; i < num_inner_nodes; i++) {
-		printf("Node %d: Splits on Dimension %d at Value %.4f\n",
-            i, c_median_dimensions[i], c_median_values[i]);
-	}
-	free(c_median_dimensions);
-	free(c_median_values);
+	// for (size_t i = 0; i < num_inner_nodes; i++) {
+	// 	printf("Node %d: Splits on Dimension %d at Value %.4f\n",
+    //         i, c_median_dimensions[i], c_median_values[i]);
+	// }
+	// free(c_median_dimensions);
+	// free(c_median_values);
 
 
 

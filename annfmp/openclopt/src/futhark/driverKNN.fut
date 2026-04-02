@@ -153,7 +153,7 @@ entry selectBestNN [n][w1][w2][h1][h2][c] -- Remove [kk] if errors occur...
 --                             (map (\i -> i / ppl) (map i32.i64 (iota (i64.i32 m'))))
 --     in  (height, shp num_inner_nodes, m', leafs, indir, orig2leaf, median_dims, median_vals, clanc_eqdim)
 
-entry buildKDtreeFlat [m][d] (height: i32) (input: [m][d]f32) =
+entry buildKDtree [m][d] (height: i32) (input: [m][d]f32) =
     let num_inner_nodes = (1 << (height+1)) - 1
     let (leafs, shp, indir, median_dims, median_vals, clanc_eqdim) =
           mkKDtree height (i64.i32 num_inner_nodes) input
@@ -266,7 +266,7 @@ let exactKnnOld [m][q][d][n][k]
 
 -- exactKnnSeg [[3.0f32, 8.0f32, 5.0f32], [2.0f32, 4.0f32, 2.0f32], [1.0f32, 1.0f32, 3.0f32], [1.0f32, 2.0f32, 3.0f32]] [3i64, 3i64, 3i64, 3i64, 0i64] [(0i32, 1.0f32, 0i32), (1i32, 2.0f32, 1i32), (0i32, 3.0f32, 2i32), (1i32, 1.0f32, 0i32)] [[1.0f32, 4.0f32, 5.0f32], [1.0f32, 4.0f32, 5.0f32]] [0i32, 0i32] [[(0i32, 1.0f32), (1i32, 2.0f32)], [(0i32, 1.0f32), (1i32, 2.0f32)]]
 
-let exactKnnSeg [m][q][d][n][k][p]
+let exactKnn [m][q][d][n][k][p]
               (ref_pts: [m][d]f32)
               (shp: [p]i64)
               (kd_tree: [q](i32,f32,i32))
@@ -328,7 +328,7 @@ entry exactKnnFixK [m][q][d][n][p]
   let knns = map2 zip knn_is[:s] knn_vs[:s]
   let kd_tree = zip3 median_dims median_vals prev_eqdims
   let (ord_knns, loop_count) =
-    exactKnnSeg ref_pts shp kd_tree (queries[:s]) (nat_leaves[:s]) knns
+    exactKnn ref_pts shp kd_tree (queries[:s]) (nat_leaves[:s]) knns
 
   let (knn_inds, knn_dsts) = unzip <| map unzip <| ord_knns
   let knn_is[:s] = knn_inds
