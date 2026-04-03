@@ -105,7 +105,7 @@ class ANNFieldPropKDTreeOpenCLOPT:
             self.platform_id,
             self.device_id,
         )
-        self._get_wrapper_module().fit_extern(self.wrapper_futhark_ctxinp, 0)
+        self._get_wrapper_module().fit_extern(self.wrapper_futhark_ctxinp, 1)
         self._get_wrapper_module().pair_free(self.wrapper_futhark_ctxinp)
 
         self._timers["futhark"] = time.time() - tstart

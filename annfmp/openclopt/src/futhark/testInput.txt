@@ -1,3 +1,14 @@
+
+h=5
+ Average L2 Score for Opencl 110.26071039835612
+
+ Average L2 Score for Openmp 107.35280905829535
+
+
+
+
+
+
 SUCCESS :)
 
 

@@ -415,6 +415,66 @@ void fit_extern( FUTHARK_CTX_INP *params, int profile ) {
     							 );
     	//printf("Default leaf size: %d, actual leaf size: %d\n", leaf_size, m_prime / (1<<(height+1)) );
     }
+
+	int64_t *c_shp_array = (int64_t*)malloc((num_inner_nodes + 1) * sizeof(int64_t));
+	futhark_values_i64_1d(fut_ctx, shp, c_shp_array);
+	printf("Shp Array; [");
+	for(int32_t i = 0; i < num_inner_nodes + 1; i++) {
+		printf("%d", c_shp_array[i]);
+		if (i < num_inner_nodes) {
+			printf(", ");
+		}
+	}
+	printf("]\n");
+	free(c_shp_array);
+
+	int32_t *c_median_dims_array = (int32_t*)malloc((num_inner_nodes) * sizeof(int32_t));
+	futhark_values_i32_1d(fut_ctx, median_dims, c_median_dims_array);
+	printf("Median dimensions; [");
+	for(int32_t i = 0; i < num_inner_nodes; i++) {
+		printf("%d", c_median_dims_array[i]);
+		if (i < num_inner_nodes) {
+			printf(", ");
+		}
+	}
+	printf("]\n");
+	free(c_median_dims_array);
+
+	float_t *c_median_vals_array = (float_t*)malloc((num_inner_nodes) * sizeof(float_t));
+	futhark_values_f32_1d(fut_ctx, median_vals, c_median_vals_array);
+	printf("Median Vals; [");
+	for(int32_t i = 0; i < num_inner_nodes; i++) {
+		printf("%f", c_median_vals_array[i]);
+		if (i < num_inner_nodes) {
+			printf(", ");
+		}
+	}
+	printf("]\n");
+	free(c_median_vals_array);
+
+	// const int64_t *shape = futhark_shape_f32_2d(fut_ctx, leaves);
+	// int64_t dim0 = shape[0];
+	// int64_t dim1 = shape[1];
+	// int64_t total = dim0 * dim1;
+
+	// float_t *c_leaves = malloc(total * sizeof(float_t));
+	// futhark_values_f32_2d(fut_ctx, leaves, c_leaves);
+
+	// printf("Leaves shape: [%lld, %lld]\n", (long long)dim0, (long long)dim1);
+
+	// int64_t limit = total < 1000 ? total : 1000;
+	// printf("Leaves: \n [");
+	// for (int64_t i = 0; i < dim0 * dim1; i++) {
+	// 	printf("%f", (double)c_leaves[i]);
+	// 	if (i < dim0 * dim1 - 1) {
+	// 		printf(", ");
+	// 	}
+	// }
+	// printf("]\n");
+
+	// free(c_leaves);
+
+
 	// int32_t *c_median_dimensions = (int32_t*)malloc(num_inner_nodes * sizeof(int32_t));
 	// float *c_median_values = (float*)malloc(num_inner_nodes * sizeof(float));
 	// futhark_values_i32_1d(fut_ctx, median_dims, c_median_dimensions);
@@ -588,7 +648,7 @@ void fit_extern( FUTHARK_CTX_INP *params, int profile ) {
 		s += futhark_free_i32_1d(fut_ctx, orig2leaf);
 		s += futhark_free_i32_1d(fut_ctx, nat_leaves);
 		s += futhark_free_f32_2d(fut_ctx, knn_dsts_all);
-		s += futhark_free_f32_2d(fut_ctx, shp);
+		s += futhark_free_i32_1d(fut_ctx, shp);
 
 		//s += futhark_free_i32_2d(fut_ctx, knn_inds_all);
 

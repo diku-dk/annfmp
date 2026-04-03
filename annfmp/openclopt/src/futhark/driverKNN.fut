@@ -5,8 +5,11 @@ import "brute-force"
 import "kd-traverse"
 import "util"
 
-def imapintra f as =
+def imap3intra f as =
   #[incremental_flattening(only_intra)] map3 f as
+
+def imap2intra f as =
+  #[incremental_flattening(only_intra)] map2 f as
 
 let sortQueriesByLeavesRadix [n] (num_bits: i32) (leaves: [n]i32) : ([n]i32, [n]i32) =
   unzip <| radix_sort_by_key (\(l,_) -> l) num_bits i32.get_bit (zip leaves (map i32.i64 (iota n)))
@@ -165,6 +168,13 @@ entry buildKDtree [m][d] (height: i32) (input: [m][d]f32) =
 --------------------------------------------------------------
 --- Finding the natural leaf to which the query belongs to ---
 --------------------------------------------------------------
+
+
+-- futhark bench file.fut *give specific entry point here* --backend=cuda --p --json=driverKNNtest.json
+
+-- futhark profile driverKNNtest.json          Creates data files with summaries.
+-- Look for the cuda kernel with futhark cuda --dumpkernel-nameOfKernel.cu
+
 let findNaturalLeaves [m][d][q][p][n] (k: i64)
                                 (ref_pts:  [m][d]f32)
                                 (shp: [p]i64)
@@ -181,7 +191,7 @@ let findNaturalLeaves [m][d][q][p][n] (k: i64)
   let (query_leaves, query_inds) = sortQueriesByLeavesRadix (h+1) query_leaves0
   let queries = gather2D queries query_inds
 
-  let knns0 = map2 (\leaf_ind query ->
+  let knns0 = imap2intra (\leaf_ind query ->
                       let beg = leaf_offsets[leaf_ind]
                       let len = shp[leaf_ind]
                       in  bruteForceSegPar query
@@ -204,6 +214,24 @@ entry findNaturalLeavesFixK [m][d][q][p][n]
                           (queries: [n][d]f32) :
                           (*[n][kk]i32, *[n][kk]f32, *[n]i32) =
   findNaturalLeaves kk ref_pts shp median_dims median_vals queries
+
+
+
+-- ==
+-- entry: testfindNaturalLeaves
+-- compiled random input { 8i64 [1048576][40]f32 1024i64 [1023]i32 [1023]f32 [1024][40]f32 }
+entry testfindNaturalLeaves [m][d][q][n] (k: i64)
+                                (ref_pts:  [m][d]f32)
+                                (p: i64)
+                                (median_dims: [q]i32)
+                                (median_vals: [q]f32)
+                                (queries:  [n][d]f32) :
+                                (*[n][k]i32, *[n][k]f32, *[n]i32) =
+
+
+  let shp = replicate p (m/p)
+  let (knn_inds, knn_vals, query_leaves0) = findNaturalLeaves k ref_pts shp median_dims median_vals queries
+  in (knn_inds, knn_vals, query_leaves0)
 
 -----------------------------
 --- Finding the exact knn ---
@@ -301,7 +329,7 @@ let exactKnn [m][q][d][n][k][p]
 
           -- do brute force
           let knns' =
-            imapintra (\query knn leaf_ind ->
+            imap3intra (\query knn leaf_ind ->
                         if leaf_ind < i32.i64 num_leaves
                         then
                           let beg = leaf_offsets[i64.i32 leaf_ind]

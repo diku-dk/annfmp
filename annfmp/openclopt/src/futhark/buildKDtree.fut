@@ -17,15 +17,15 @@ local let closestLog2 (p: i32) : i32 =
 let computeSegIds (size: i64) (shp: []i64) : []i64 =
     let offsets = exScan (+) 0 shp                                           -- [0, 1]
     let flagArray = scatter (replicate size 0i64) offsets (map (\_ -> 1i64) shp)    -- [1, 1, 0, 0]
-    let II1 = scan (+) 0i64 flagArray                                                -- [1, 2, 2, 2]            
+    let II1 = scan (+) 0i64 flagArray                                                -- [1, 2, 2, 2]
     in map (\x -> x - 1) II1                                              -- [0, 1, 1, 1]
 
 -- Implementing DPP Notes on II1, FlagArray, Offset etc
-let computeOffsetsFlagsII1 (size: i64) (nodes_this_lvl: i64) (shp: []i64) : ([]u32, []i64, []i64) = 
+let computeOffsetsFlagsII1 (size: i64) (nodes_this_lvl: i64) (shp: []i64) : ([]u32, []i64, []i64) =
     let (B1, F1) =  mkIrFlagArray (map u32.i64 shp) 0 (iota nodes_this_lvl)
     let F1fix = F1 :> [size]i64
     let Farr = map bool.i64 F1
-    let II1 = map (\x -> x+1) (irsgmscan (+) 0 Farr F1) :> [size]i64 
+    let II1 = map (\x -> x+1) (irsgmscan (+) 0 Farr F1) :> [size]i64
     in (B1, F1fix, II1)
 
 -- SHOULD PROBABLY BE REDEFINED TO GIVE TREE SHAPE FROM HEIGHT INSTEAD
@@ -84,6 +84,10 @@ local let findClosestMed [n] (cur_dim: i32) (median_dims: [n]i32) (node_ind: i32
 -- mkKDtree takes a set of points, pads them to fit a complete KD-tree,
 -- repeatedly sorts node point chunks by the widest dimension,
 -- and returns both the reordered leaf layout and the per-node split metadata needed to represent the KD-tree.
+
+
+
+
 let mkKDtree [m] [d] (height: i32) (q: i64)
                      (input: [m][d]f32) :
            (*[m][d]f32, *[q+1]i64, *[m]i32, *[q]i32, *[q]f32, *[q]i32) =
@@ -102,7 +106,7 @@ let mkKDtree [m] [d] (height: i32) (q: i64)
 
     -- Initializations
     let indir       = (map (\x -> i32.i64 x) (iota m)) -- should be m
-    -- start value for shp is the full length of the input 
+    -- start value for shp is the full length of the input
     -- let num_leaves  = 1i64 << (i64.i32 height + 1i64)
     -- let _ = trace num_leaves
     -- let shp0        = replicate (q+1) 0i64
@@ -110,7 +114,7 @@ let mkKDtree [m] [d] (height: i32) (q: i64)
     let median_vals = replicate q 0.0f32
     let median_dims = replicate q (-1i32)
     let clanc_eqdim = replicate q (-1i32)
-    
+
     -- Loop
     let ( indir' : *[m]i32
         , shp' : *[q+1]i64
@@ -151,11 +155,11 @@ let mkKDtree [m] [d] (height: i32) (q: i64)
                         in  (cur_dim, prev_anc)
                     ) (map (\x -> i32.i64 x) (iota nodes_this_lvl))
                 |> unzip
-            
+
             ------------ RANK K SEARCH -------------
 
             let seg_ids = computeSegIds m cur_shp
-            
+
             -- For each node chunk, grab only the coordinate values in the split dimension.
             -- So if a specific node splits on dimension 2, it extracts the 2nd coordinate of each point in that one node.
             let chosen_columns = map2 (\ind seg ->
@@ -165,7 +169,7 @@ let mkKDtree [m] [d] (height: i32) (q: i64)
             let _ = trace cur_shp
             let (B1, F1fix, II1) = computeOffsetsFlagsII1 m nodes_this_lvl cur_shp
             let med_vals = computeMedianWithRankK cur_shp chosen_columns (map i64.u32 B1) F1fix II1
-            
+
             --------- PARTITION2L -----------
             -- Hypothesis: VERIFIED
             -- Using indir instead of the input array in partition2L may allow us to track how each element has been scattered
@@ -179,9 +183,10 @@ let mkKDtree [m] [d] (height: i32) (q: i64)
             -- Example:
             -- shp = [3, 5] -> shp' = [1, 2, 4, 1]
             -- splitInds = [1, 4]
-            -- shp' = 1, 3-1, 4, 5-4
-            let splitInds64 = map i64.i32 splitInds 
-            let cur_shp' = map2 (\len ind -> [ind] ++ [len - ind]) cur_shp splitInds64 |> flatten
+            -- shp' = [1, 3-1, 4, 5-4]
+            -- if splitInd == -1 then [0, 0]
+            let splitInds64 = map i64.i32 splitInds
+            let cur_shp' = map2 (\len ind -> if len == 0 then [len] ++ [len] else [ind] ++ [len - ind]) cur_shp splitInds64 |> flatten
             let shp' = scatter shp (iota (nodes_this_lvl * (1 + 1))) cur_shp'
 
             -- scatter the values of this level in the global result arrays
@@ -196,6 +201,13 @@ let mkKDtree [m] [d] (height: i32) (q: i64)
     let input' = map (\ ind -> map (\k -> input[ind, k]) (iota d) ) indir' :> *[m][d]f32
     in  (input', shp', indir', median_dims', median_vals', clanc_eqdim')
 
+entry main (input: [][]f32) :
+           (*[]i64, *[]i32, *[]f32) =
+    let height = 8i32
+    let num_inner_nodes = (1 << (height+1)) - 1
+    let (input', shp', indir', median_dims', median_vals', clanc_eqdim') = mkKDtree height (i64.i32 num_inner_nodes) input
+
+    in (shp', median_dims', median_vals')
 
 -- let main0 (m: i32) (defppl: i32) =
 --     computeTreeShape m defppl
