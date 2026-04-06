@@ -15,12 +15,12 @@ local let closestLog2 (p: i32) : i32 =
 -- This creates the segment ids for chosen_columns
 -- For instance shp = [1i64, 3i64] makes seg_ids become [0, 1, 1, 1]
 let computeSegIds (size: i64) (shp: []i64) : []i64 =
-    let offsets = exScan (+) 0 shp                                           -- [0, 1]
-    let flagArray = scatter (replicate size 0i64) offsets (map (\_ -> 1i64) shp)    -- [1, 1, 0, 0]
-    let II1 = scan (+) 0i64 flagArray                                                -- [1, 2, 2, 2]
-    in map (\x -> x - 1) II1                                              -- [0, 1, 1, 1]
+    let offsets = exScan (+) 0 shp                                  
+    let flagArray = scatter (replicate size 0i64) offsets (map (\_ -> 1i64) shp)    
+    let II1 = scan (+) 0i64 flagArray                                              
+    in map (\x -> x - 1) II1                                             
 
--- Implementing DPP Notes on II1, FlagArray, Offset etc
+-- Implemented DPP Notes on II1, FlagArray, Offset etc
 let computeOffsetsFlagsII1 (size: i64) (nodes_this_lvl: i64) (shp: []i64) : ([]u32, []i64, []i64) =
     let (B1, F1) =  mkIrFlagArray (map u32.i64 shp) 0 (iota nodes_this_lvl)
     let F1fix = F1 :> [size]i64
@@ -28,7 +28,7 @@ let computeOffsetsFlagsII1 (size: i64) (nodes_this_lvl: i64) (shp: []i64) : ([]u
     let II1 = map (\x -> x+1) (irsgmscan (+) 0 Farr F1) :> [size]i64
     in (B1, F1fix, II1)
 
--- SHOULD PROBABLY BE REDEFINED TO GIVE TREE SHAPE FROM HEIGHT INSTEAD
+-- CURRENTLY NOT IN USE
 -- m: the number of reference points
 -- defppl: the default number of points per leaf
 -- result: (height of tree without leaves, number of points per leaf)
@@ -68,35 +68,22 @@ local let findClosestMed [n] (cur_dim: i32) (median_dims: [n]i32) (node_ind: i32
             in  (parent, res_ind)
     in  res
 
+
+
 -- height: the height of the tree excluding leaves
 -- q: the number of internal tree nodes (i.e., without leaves)
--- ppl: number of reference points per leaf
--- m' : the number of reference points hold in the tree
---    The following invariants hold: #leaves = q + 1 AND m' = (q+1) * ppl
 -- input:  the d-dimensional array of reference points from which the tree is constructed
--- result: a tuple of five arrays
+-- result: a tuple of six arrays
 --         1. the reordered points (per leaf)
---         2. the indirect array that holds the original indices of each point
---         3. the index of the dimension that is split
---         4. the median value of the split dimension
---         5. the closest ancestor node index that splits the same dimension (or -1 if none)
-
--- mkKDtree takes a set of points, pads them to fit a complete KD-tree,
--- repeatedly sorts node point chunks by the widest dimension,
--- and returns both the reordered leaf layout and the per-node split metadata needed to represent the KD-tree.
-
-
-
+--         2. the shape array that contains the size of each leaf
+--         3. the indirect array that holds the original indices of each point
+--         4. the index of the dimension that is split
+--         5. the median value of the split dimension
+--         6. the closest ancestor node index that splits the same dimension (or -1 if none)
 
 let mkKDtree [m] [d] (height: i32) (q: i64)
                      (input: [m][d]f32) :
            (*[m][d]f32, *[q+1]i64, *[m]i32, *[q]i32, *[q]f32, *[q]i32) =
-
-    -- We should know about shape in order to use rank k search
-    -- We might need a variable here outside the loop, that can continuously be modified
-    -- based on the current level of the tree.
-    -- Maybe it should have length equal to the final amount of leaves and then just
-    -- be sliced whenever it's given to rank k search function?
 
     -- Initial bounds used to calculate highest spread dimension.
     let inputT = transpose input
@@ -130,15 +117,6 @@ let mkKDtree [m] [d] (height: i32) (q: i64)
         for lev < (height+1) do
             let nodes_this_lvl = 1i64 << i64.i32 lev
             let cur_shp = shp[0:nodes_this_lvl]
-
-            -- compute the dimensions to be split for each node at this level
-            -- and also the index of the closest ancestor that has split the
-            -- same dimension
-            -- For each node:
-            -- compute current bounds by replaying all parent split choices to see what region the node lives in with updateBounds
-            -- compute spread in each dimension
-            -- choose the dimension with maximum spread
-            -- find closest ancestor with same dimension using findClosestMed
             let (med_dims, anc_same_med) =
                 map (\ (i: i32) ->
                         let node_ind = i + i32.i64 nodes_this_lvl - 1
@@ -171,8 +149,6 @@ let mkKDtree [m] [d] (height: i32) (q: i64)
             let med_vals = computeMedianWithRankK cur_shp chosen_columns (map i64.u32 B1) F1fix II1
 
             --------- PARTITION2L -----------
-            -- Hypothesis: VERIFIED
-            -- Using indir instead of the input array in partition2L may allow us to track how each element has been scattered
             let bools = map2 (\x seg -> x < med_vals[seg]) chosen_columns seg_ids
 
             let indir = map i64.i32 indir
@@ -194,36 +170,11 @@ let mkKDtree [m] [d] (height: i32) (q: i64)
             let median_dims' = scatter median_dims this_lev_inds med_dims
             let median_vals' = scatter median_vals this_lev_inds med_vals[0:nodes_this_lvl]
             let clanc_eqdim' = scatter clanc_eqdim this_lev_inds anc_same_med
-            -- let indir'' = flatten indir2d' :> *[m]i32
 
             in  (indir', shp', median_dims', median_vals', clanc_eqdim')
 
     let input' = map (\ ind -> map (\k -> input[ind, k]) (iota d) ) indir' :> *[m][d]f32
     in  (input', shp', indir', median_dims', median_vals', clanc_eqdim')
-
-entry main (input: [][]f32) :
-           (*[]i64, *[]i32, *[]f32) =
-    let height = 8i32
-    let num_inner_nodes = (1 << (height+1)) - 1
-    let (input', shp', indir', median_dims', median_vals', clanc_eqdim') = mkKDtree height (i64.i32 num_inner_nodes) input
-
-    in (shp', median_dims', median_vals')
-
--- let main0 (m: i32) (defppl: i32) =
---     computeTreeShape m defppl
-
---   let defppl = 4i32
---   let input : [16][1]f32 =
---
-
--- ==
--- compiled input { 4i32 [[1f32],[2f32],[3f32],[4f32],[4f32],[5f32],[6f32],[7f32],[8f32],[8f32],[9f32],[2f32],[3f32],[4f32],[5f32]] }
--- -- output { 1 3 16 [[1f32],[2f32],[2f32],[3f32],[3f32],[4f32],[4f32],[4f32],[5f32],[5f32],[6f32],[7f32],[8f32],[8f32],[9f32],[f32.inf]] [0i32,1i32,11i32,2i32,12i32,3i32,4i32,13i32,5i32,14i32,6i32,7i32,8i32,9i32,10i32,15i32] [0, 0, 0] [4.5f32, 3f32, 7.5f32] [-1, 0, 0] }
--- let main [m][d] (defppl: i32) (input: [m][d]f32) =
---     let (height, num_inner_nodes, _ppl, m') = computeTreeShape (i32.i64 m) defppl
---     let (leafs, indir, median_dims, median_vals, clanc_eqdim) =
---           mkKDtree height (i64.i32 num_inner_nodes) (i64.i32 m') input
---     in  (height, num_inner_nodes, m', leafs, indir, median_dims, median_vals, clanc_eqdim)
 
 --
 -- Useful Commands

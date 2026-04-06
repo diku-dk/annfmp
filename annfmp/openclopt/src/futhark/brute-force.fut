@@ -2,6 +2,7 @@ let sumSqrsSeq [d] (xs: [d]f32) (ys: [d]f32) : f32 =
     loop (res) = (0.0f32) for (x,y) in (zip xs ys) do
         let z = x-y in res + z*z
 
+-- OLD VERSION
 let bruteForce [m][d][k] (query: [d]f32)
                          (knns0: [k](i32,f32))
                          (beg: i32, refs : [m][d]f32)
@@ -38,6 +39,7 @@ let sortPartSortedSeqs [k] (knn: [k](i32,f32)) : [k](i32,f32) =
         in  (knn_sort, beg', end')
   in  res
 
+-- OLD VERSION
 -- query: query point to be searched for
 -- knn0:  initial knns
 -- beg:   index pointing at beginning of leaf
@@ -68,16 +70,15 @@ let bruteForcePar [m][d][k] (query: [d]f32)
   let knn_sort = sortPartSortedSeqs knn
   in  knn_sort
 
+
 -- SEGMENTED VERSION
 -- query: query point to be searched for
--- knn0:  initial knns
--- beg:   index pointing at beginning of leaf
--- refs:  2D list of point in leaf
+-- knn0:  Initial knns
+-- beg:   Index pointing at beginning of leaf
+-- len:   Length of the leaf
+-- refs:  2D list of points
 
-def imapintra as f = 
-  #[incremental_flattening(only_intra)] map f as
-
--- bruteForceSegPar [1.0,4.0,5.0] [(0,1.0),(1,2.0),(2,9.0),(3,5.0)] 0 4 4 [[3.0,8.0,5.0],[2.0,4.0,2.0],[1.0,1.0,3.0],[1.0,2.0,3.0]]
+-- Result:  Sorted Knn
 
 let bruteForceSegPar [m][d][k] (query: [d]f32)
                          (knn0: [k](i32,f32))
@@ -87,11 +88,8 @@ let bruteForceSegPar [m][d][k] (query: [d]f32)
                          (ref_pts: [m][d]f32)
                        : [k](i32,f32) =
   let B = avg_leafsize
-  -- let refs = copy ref_pts[beg:beg+len]
   let knn = copy knn0
   let visited = replicate k (-1i64) 
---  let diststmp = map (sumSqrsSeq query) refs -- euclidian distances
---  let dists = diststmp :> [len]f32 
   let cycle = true
   let j = 0i32
   let (_, knn, _, _) =

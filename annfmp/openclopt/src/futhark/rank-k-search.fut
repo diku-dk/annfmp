@@ -125,18 +125,3 @@ def computeMedianWithRankK (shp: []i64) (input: []f32) (offsets: []i64) (flagArr
   let med_vals = rankSearchBatch means ks shp (map i32.i64 II1) A
   in med_vals
 
-
--- ==
--- compiled input { [[11f32, 1f32, 5f32, 20f32], [9f32, 54f32, 12f32, 2f32], [85f32, 59f32, 1857f32, 3f32]] }
--- output { [11f32, 12f32, 85f32] }
--- let main [m][n] (ass: [m][n]f32) =
---     computeMedianWithRankK ass
-
-
--- ==
--- compiled input { [11,9,16] [2,3,4] [3,5,7] [1,1,1,2,2,2,2,2,3,3,3,3,3,3,3] [5,10,17,3,6,9,12,15,4,8,12,16,20,24,28] }
--- output { [11f32, 12f32, 85f32] }
-let main [m][n] (meds: [m]f32) (ks: [m]i32)
-                            (shp: [m]i32) (II1: *[n]i32) (A: *[n]f32) : [m]f32 =
-    rankSearchBatch meds ks shp II1 A
-

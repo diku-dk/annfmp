@@ -90,13 +90,13 @@ let reducePatchDim_OLD [d][d_red][h][w][c] (img: [h][w][c]i32) (comps: [d_red][d
 --- Selecting the best NN from large patch ---
 ----------------------------------------------
 
-entry selectBestNN_BAD [n][w1][w2][h1][h2][c] -- Remove [kk] if errors occur...
+entry selectBestNN_BAD [n][w1][w2][h1][h2][c]
                     (_p: i32) (knn_inds: [n][kk]i32)
                     (_imgA: [h1][w1][c]f32) (_imgB: [h2][w2][c]f32)
                   : ([n]i32, [n]f32) =
   (knn_inds[:,0], replicate n 0.0f32)
 
-entry selectBestNN [n][w1][w2][h1][h2][c] -- Remove [kk] if errors occur...
+entry selectBestNN [n][w1][w2][h1][h2][c]
                     (p: i32) (knn_inds: [n][kk]i32)
                     (imgA: [h1][w1][c]i32) (imgB: [h2][w2][c]i32)
                   : ([n]i32, [n]f32, f32) =
@@ -147,14 +147,6 @@ entry selectBestNN [n][w1][w2][h1][h2][c] -- Remove [kk] if errors occur...
 -- entry: buildKDtree
 --
 -- compiled random input { 256i32 [2097152][7]f32 }
-
--- entry buildKDtree [m][d] (defppl: i32) (input: [m][d]f32) =
---     let (height, num_inner_nodes, ppl, m') = computeTreeShape (i32.i64 m) defppl
---     let (leafs, shp, indir, median_dims, median_vals, clanc_eqdim) =
---           mkKDtree height (i64.i32 num_inner_nodes) input
---     let orig2leaf = scatter (replicate (i64.i32 m') (-1i32)) (map i64.i32 indir)
---                             (map (\i -> i / ppl) (map i32.i64 (iota (i64.i32 m'))))
---     in  (height, shp num_inner_nodes, m', leafs, indir, orig2leaf, median_dims, median_vals, clanc_eqdim)
 
 entry buildKDtree [m][d] (height: i32) (input: [m][d]f32) =
     let num_inner_nodes = (1 << (height+1)) - 1
@@ -301,10 +293,6 @@ let exactKnn [m][q][d][n][k][p]
               (queries: [n][d]f32)
               (nat_leaves: *[n]i32)
               (knns:   *[n][k](i32,f32)) : (*[n][k](i32,f32), i32) =
-  -- let (h, ppl, num_leaves) = getHeightPpl (i32.i64 q) (i32.i64 m)
-  -- let leaves = unflatten num_leaves ppl ref_pts
-  -- let ref_pts_tmp = ref_pts :> [num_leaves*ppl][d]f32
-  -- let leaves = unflatten ref_pts_tmp
   let (h, _, num_leaves) = getHeightPpl (i32.i64 q) (i32.i64 m)
   let _ = trace num_leaves
   let leaf_offsets = exScan (+) 0i64 shp
