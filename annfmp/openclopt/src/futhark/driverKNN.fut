@@ -5,11 +5,14 @@ import "brute-force"
 import "kd-traverse"
 import "util"
 
-def imap3intra f as =
-  #[incremental_flattening(only_intra)] map3 f as
+def imap2intra f as bs =
+  #[incremental_flattening(only_intra)] map2 f as bs
 
-def imap2intra f as =
-  #[incremental_flattening(only_intra)] map2 f as
+def imap3intra f as bs cs =
+  #[incremental_flattening(only_intra)] map3 f as bs cs
+
+def imap4intra f as bs cs ds =
+  #[incremental_flattening(only_intra)] map4 f as bs cs ds
 
 let sortQueriesByLeavesRadix [n] (num_bits: i32) (leaves: [n]i32) : ([n]i32, [n]i32) =
   unzip <| radix_sort_by_key (\(l,_) -> l) num_bits i32.get_bit (zip leaves (map i32.i64 (iota n)))
@@ -143,11 +146,6 @@ entry selectBestNN [n][w1][w2][h1][h2][c]
 --- Building the k-d Tree ---
 -----------------------------
 
--- ==
--- entry: buildKDtree
---
--- compiled random input { 256i32 [2097152][7]f32 }
-
 entry buildKDtree [m][d] (height: i32) (input: [m][d]f32) =
     let num_inner_nodes = (1 << (height+1)) - 1
     let (leafs, shp, indir, median_dims, median_vals, clanc_eqdim) =
@@ -160,12 +158,6 @@ entry buildKDtree [m][d] (height: i32) (input: [m][d]f32) =
 --------------------------------------------------------------
 --- Finding the natural leaf to which the query belongs to ---
 --------------------------------------------------------------
-
-
--- futhark bench file.fut *give specific entry point here* --backend=cuda --p --json=driverKNNtest.json
-
--- futhark profile driverKNNtest.json          Creates data files with summaries.
--- Look for the cuda kernel with futhark cuda --dumpkernel-nameOfKernel.cu
 
 let findNaturalLeaves [m][d][q][p][n] (k: i64)
                                 (ref_pts:  [m][d]f32)
@@ -281,11 +273,6 @@ let exactKnnOld [m][q][d][n][k]
           in  (queries', knns'', new_leaves', new_stacks', new_dists', ord_knns', query_inds', i+1, n'')
   in  (ord_knns', loop_count)
 
--- exactKnnSeg [[3.0,8.0,5.0],[2.0,4.0,2.0],[1.0,1.0,3.0],[1.0,2.0,3.0]] [3,3]
--- ([0,1,0,1],[1.0,2.0,3.0,1.0],[0,1,2,0]) [[1.0,4.0,5.0],[1.0,4.0,5.0]] [0,0] [(0,1.0),(1,2.0)]
-
--- exactKnnSeg [[3.0f32, 8.0f32, 5.0f32], [2.0f32, 4.0f32, 2.0f32], [1.0f32, 1.0f32, 3.0f32], [1.0f32, 2.0f32, 3.0f32]] [3i64, 3i64, 3i64, 3i64, 0i64] [(0i32, 1.0f32, 0i32), (1i32, 2.0f32, 1i32), (0i32, 3.0f32, 2i32), (1i32, 1.0f32, 0i32)] [[1.0f32, 4.0f32, 5.0f32], [1.0f32, 4.0f32, 5.0f32]] [0i32, 0i32] [[(0i32, 1.0f32), (1i32, 2.0f32)], [(0i32, 1.0f32), (1i32, 2.0f32)]]
-
 let exactKnn [m][q][d][n][k][p]
               (ref_pts: [m][d]f32)
               (shp: [p]i64)
@@ -355,7 +342,6 @@ entry exactKnnFixK [m][q][d][n][p]
 ------------------------------
 --- Propagatingation Phase ---
 ------------------------------
--- This is hopefully an unneeded helper function soon
 let estimateIndex [m] (n_rows: i32) (n_cols: i32)
                   (indir: [m]i32) (orig2leaf: [m]i32)
                   (par_ind: i32) : i32 =
@@ -370,6 +356,7 @@ let estimateIndex [m] (n_rows: i32) (n_cols: i32)
 
 let propagate [m][d][p][nr][nc][k]
               (ref_pts:   [m][d]f32)
+              (indir:     [m]i32)
               (shp:       [p]i64)
               (orig2leaf: [m]i32)
               (queries:   [nr][nc][d]f32)
@@ -393,39 +380,28 @@ let propagate [m][d][p][nr][nc][k]
                 let n_inds = 0i32
 
                 let (n_inds, u_leafs) =
-                  loop (n_inds, u_leafs) for q < k do
-                    let par_pt = par_inds[q]
-
-                    in if par_pt < 0
-                       then (n_inds, u_leafs)
-                       else
-                         let below_pt = par_pt + i32.i64 nc
-                         in if below_pt >= i32.i64 m
-                            then (n_inds, u_leafs)
-                            else
-                              let par_leaf = orig2leaf[below_pt]
-
-                              -- do not search natural leaf again
-                              let not_found0 = par_leaf != nat_leaf
-
-                              let (j_final, not_found) =
-                                loop (j, nf) = (0i32, not_found0)
-                                  while nf && j < n_inds do
-                                    if u_leafs[j] == par_leaf
-                                    then (j, false)
-                                    else (j+1, true)
-
-                              in if not_found
-                                 then let u_leafs[n_inds] = par_leaf
-                                      in (n_inds+1, u_leafs)
-                                 else (n_inds, u_leafs)
+                  loop (n_inds, u_leafs) 
+                    for q < k do
+                      let par_ind = estimateIndex (i32.i64 nr) (i32.i64 nc) indir orig2leaf (par_inds[q])
+                      let not_found = par_ind != nat_leaf
+                      let j = 0i32
+                      let (_,not_found) =
+                        loop (j,not_found)
+                          while not_found && j < n_inds do
+                            if u_leafs[j] == par_ind
+                            then (j,   false)
+                            else (j+1, true)
+                      in  if not_found
+                          then  let u_leafs[n_inds] = par_ind
+                                in  (n_inds+1, u_leafs)
+                          else  (n_inds, u_leafs)
 
                 in (n_inds, u_leafs)
              ) upw_knn_inds nat_leaves[i]
 
       let new_knn_row =
         opaque <|
-        map4 (\(n_inds: i32) (u_leafs: [k]i32) (knn0: [k](i32,f32)) (query: [d]f32) ->
+        imap4intra (\(n_inds: i32) (u_leafs: [k]i32) (knn0: [k](i32,f32)) (query: [d]f32) ->
                 let knn = opaque <| copy knn0
                 in loop (knn) for q < n_inds do
                      let leaf_ind = u_leafs[q]
@@ -440,7 +416,7 @@ let propagate [m][d][p][nr][nc][k]
   in knns'
 
 entry propagateFixK [m][d][p][n]
-              (nr: i32) -- assumes `nr` equally divides `n`
+              (nr: i32)
               (ref_pts: [m][d]f32)
               (shp: [p]i64)
               (indir: [m]i32)
@@ -463,7 +439,7 @@ entry propagateFixK [m][d][p][n]
   let knns1 = knns0 :> [nr64*nc][kk](i32,f32)
   let knns = unflatten knns1 :> [nr64][nc][kk](i32,f32)
 
-  let knns' = propagate ref_pts shp orig2leaf queries nat_leaves knns
+  let knns' = propagate ref_pts indir shp orig2leaf queries nat_leaves knns
   let knns_flat' = flatten knns' :> [n][kk](i32,f32)
   let (knn_inds', knn_dsts') = unzip <| map unzip knns_flat'
 
