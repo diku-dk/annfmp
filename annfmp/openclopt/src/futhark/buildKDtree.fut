@@ -15,10 +15,10 @@ local let closestLog2 (p: i32) : i32 =
 -- This creates the segment ids for chosen_columns
 -- For instance shp = [1i64, 3i64] makes seg_ids become [0, 1, 1, 1]
 let computeSegIds (size: i64) (shp: []i64) : []i64 =
-    let offsets = exScan (+) 0 shp                                  
-    let flagArray = scatter (replicate size 0i64) offsets (map (\_ -> 1i64) shp)    
-    let II1 = scan (+) 0i64 flagArray                                              
-    in map (\x -> x - 1) II1                                             
+    let offsets = exScan (+) 0 shp
+    let flagArray = scatter (replicate size 0i64) offsets (map (\_ -> 1i64) shp)
+    let II1 = scan (+) 0i64 flagArray
+    in map (\x -> x - 1) II1
 
 -- Implemented DPP Notes on II1, FlagArray, Offset etc
 let computeOffsetsFlagsII1 (size: i64) (nodes_this_lvl: i64) (shp: []i64) : ([]u32, []i64, []i64) =
@@ -52,8 +52,7 @@ local let updateBounds [n] [d2] (level: i32) (median_dims: [n]i32) (median_vals:
         let anc_dim = i64.i32 median_dims[ancestor]
         let lub_ind = if  (ancestor_child & 1) == 0 then anc_dim else d+anc_dim
                       -- if right node, then update lower bound
-        let anc_med = median_vals[ancestor]
-        let lubs_cur[lub_ind] = if !(f32.isinf anc_med) then anc_med else lubs_cur[lub_ind]
+        let lubs_cur[lub_ind] = median_vals[ancestor]
         in  (ancestor_child, lubs_cur)
     in  res
 
@@ -123,12 +122,15 @@ let mkKDtree [m] [d] (height: i32) (q: i64)
                         -- walk from root to node and update bounds
                         let lubs_cur = updateBounds lev median_dims median_vals
                                                     node_ind (copy lubs)
+                        let _ = trace lubs_cur
                         -- chose dimension of highest spread
                         let diffs = map (\i -> f32.abs(lubs_cur[i+d] - lubs_cur[i])) (iota d)
+                        let _ = trace diffs
                         let (cur_dim, _) = reduce_comm (\ (i1,v1) (i2,v2) ->
                                                             if v1 >= v2 then (i1, v1)
                                                                         else (i2, v2) )
                                                         (-1, f32.lowest) <| zip (map (\x -> i32.i64 x) (iota d)) diffs
+                        let _ = trace cur_dim
                         let prev_anc = findClosestMed cur_dim median_dims node_ind
                         in  (cur_dim, prev_anc)
                     ) (map (\x -> i32.i64 x) (iota nodes_this_lvl))
@@ -144,7 +146,6 @@ let mkKDtree [m] [d] (height: i32) (q: i64)
                                         input[ind, med_dims[seg]]
                                     ) indir seg_ids
 
-            let _ = trace cur_shp
             let (B1, F1fix, II1) = computeOffsetsFlagsII1 m nodes_this_lvl cur_shp
             let med_vals = computeMedianWithRankK cur_shp chosen_columns (map i64.u32 B1) F1fix II1
 
@@ -171,6 +172,10 @@ let mkKDtree [m] [d] (height: i32) (q: i64)
             let median_vals' = scatter median_vals this_lev_inds med_vals[0:nodes_this_lvl]
             let clanc_eqdim' = scatter clanc_eqdim this_lev_inds anc_same_med
 
+            let _ = trace shp'
+            -- let _ = trace median_dims'
+            -- let _ = trace median_vals'
+            -- let _ = trace indir'
             in  (indir', shp', median_dims', median_vals', clanc_eqdim')
 
     let input' = map (\ ind -> map (\k -> input[ind, k]) (iota d) ) indir' :> *[m][d]f32

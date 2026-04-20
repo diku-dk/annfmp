@@ -148,14 +148,14 @@ let main =
     -- let _ = trace shp'
     -- in shp'
 
-    -- NaturalLeaves test:))
-    let ref_pts = [[1.3f32, 4.7f32], [5.2f32, 7.9f32], [9.1f32, 3.6f32], [2.4f32, 8.8f32], [6.5f32, 1.2f32], [7.7f32, 5.5f32], [3.3f32, 9.9f32], [8.8f32, 2.1f32], [4.4f32, 6.6f32], [0.9f32, 3.3f32], [2.2f32, 7.7f32], [5.5f32, 8.1f32], [9.9f32, 0.4f32], [1.1f32, 2.8f32], [6.8f32, 4.2f32], [7.3f32, 9.0f32], [3.7f32, 1.5f32], [8.1f32, 6.3f32], [4.9f32, 2.2f32], [0.6f32, 7.4f32], [2.5f32, 5.8f32], [9.2f32, 8.6f32], [1.7f32, 3.9f32], [6.0f32, 4.5f32], [7.8f32, 0.7f32], [3.1f32, 9.4f32], [5.9f32, 6.2f32], [2.9f32, 5.1f32], [2.9f32, 5.1f32], [2.9f32, 5.1f32], [2.9f32, 5.1f32], [2.9f32, 5.1f32]]
+    -- -- NaturalLeaves test:))
+    let ref_pts = [[1.3f32, 4.7f32], [5.2f32, 7.9f32], [-9.1f32, 3.6f32], [-2.4f32, 8.8f32], [6.5f32, 1.2f32], [-7.7f32, 5.5f32], [3.3f32, 9.9f32], [-8.8f32, -2.1f32], [4.4f32, 6.6f32], [0.9f32, 3.3f32], [2.2f32, 7.7f32], [5.5f32, -8.1f32], [9.9f32, 0.4f32], [1.1f32, -2.8f32], [6.8f32, 4.2f32], [7.3f32, -9.0f32], [3.7f32, 1.5f32], [8.1f32, 6.3f32], [4.9f32, 2.2f32], [0.6f32, -7.4f32], [2.5f32, 5.8f32], [9.2f32, -8.6f32], [-1.7f32, 3.9f32], [6.0f32, 4.5f32], [7.8f32, -0.7f32], [-3.1f32, 9.4f32], [5.9f32, 6.2f32], [-2.9f32, -5.1f32], [2.9f32, 5.1f32], [2.9f32, 5.1f32], [2.9f32, 5.1f32], [-2.9f32, 5.1f32]]
 
     -- let median_dims = [1i32, 0i32, 0i32, 0i32, 1i32, 1i32, 0i32]
     -- let median_vals = [5.1f32, 6.0f32, 3.1f32, 1.7f32, 2.1f32, 5.1f32, 5.9f32]
-    let queries = [[5f32, 6f32], [3f32, 9f32], [1f32, 4f32], [8f32, 6f32]]
+    -- let queries = [[5f32, 6f32], [3f32, 9f32], [1f32, 4f32], [8f32, 6f32]]
 
-    let shp = [3i64, 3i64, 3i64, 4i64, 0i64, 9i64, 5i64, 5i64]
+    -- let shp = [3i64, 3i64, 3i64, 4i64, 0i64, 9i64, 5i64, 5i64]
 
     -- let (knn_inds, knn_vals, query_leaves0) = findNaturalLeaves 8i64 ref_pts shp median_dims median_vals queries
 
@@ -165,29 +165,36 @@ let main =
 
     -- in knn_vals
 
-    let height = 2
+    let height = 5
 
     let num_inner_nodes = (1 << (height+1)) - 1
     let (leafs, shp, indir, median_dims, median_vals, clanc_eqdim) =
           mkKDtree height (i64.i32 num_inner_nodes) ref_pts
-    let (_, _, II1) = (computeOffsetsFlagsII1 32 (i64.i32 num_inner_nodes + 1) shp)
-    let seg_ids = map (\x -> x - 1) II1
-    let orig2leaf = scatter (replicate 32 (-1i32)) (map i64.i32 indir) (map i32.i64 seg_ids)
+    -- let (_, _, II1) = (computeOffsetsFlagsII1 32 (i64.i32 num_inner_nodes + 1) shp)
+    -- let seg_ids = map (\x -> x - 1) II1
+    -- let orig2leaf = scatter (replicate 32 (-1i32)) (map i64.i32 indir) (map i32.i64 seg_ids)
 
-    let (knn_inds, knn_vals, nat_leaves) = findNaturalLeavesFixK leafs shp median_dims median_vals queries
+    let _ = trace shp
+    -- let _ = trace median_dims
+    -- let _ = trace median_vals
 
-    let _ = trace knn_inds
-    let _ = trace knn_vals
-    let _ = trace nat_leaves
-    -- let knnss  = (map2 (\i v -> zip i v) knn_inds knn_vals)
+    in leafs
 
-    let (knn_is, knn_vs, _) = exactKnnFixK leafs median_dims median_vals clanc_eqdim shp 4i64 queries (copy nat_leaves) knn_inds knn_vals
 
-    let _ = trace knn_is
-    let _ = trace knn_vs
+    -- let (knn_inds, knn_vals, nat_leaves) = findNaturalLeavesFixK leafs shp median_dims median_vals queries
 
-    let knns = propagateFixK 4i32 leafs shp indir orig2leaf queries nat_leaves knn_is knn_vs
+    -- let _ = trace knn_inds
+    -- let _ = trace knn_vals
+    -- let _ = trace nat_leaves
+    -- -- let knnss  = (map2 (\i v -> zip i v) knn_inds knn_vals)
 
-    let _ = trace knns
+    -- let (knn_is, knn_vs, _) = exactKnnFixK leafs median_dims median_vals clanc_eqdim shp 4i64 queries (copy nat_leaves) knn_inds knn_vals
 
-    in knns
+    -- let _ = trace knn_is
+    -- let _ = trace knn_vs
+
+    -- let knns = propagateFixK 4i32 leafs shp indir orig2leaf queries nat_leaves knn_is knn_vs
+
+    -- let _ = trace knns
+
+    -- in knns
