@@ -128,6 +128,7 @@ int futhark_entry_propagateFixK(struct futhark_context *ctx, struct futhark_i32_
 int futhark_entry_reducePatchDim(struct futhark_context *ctx, struct futhark_f32_2d **out0, const struct futhark_u8_2d *in0, const struct futhark_f32_2d *in1, const struct futhark_f32_1d *in2);
 int futhark_entry_selectBestNN(struct futhark_context *ctx, struct futhark_i32_1d **out0, struct futhark_f32_1d **out1, float *out2, const int32_t in0, const struct futhark_i32_2d *in1, const struct futhark_i32_3d *in2, const struct futhark_i32_3d *in3);
 int futhark_entry_selectBestNN_BAD(struct futhark_context *ctx, struct futhark_i32_1d **out0, struct futhark_f32_1d **out1, const int32_t in0, const struct futhark_i32_2d *in1, const struct futhark_f32_3d *in2, const struct futhark_f32_3d *in3);
+int futhark_entry_testfindNaturalLeaves(struct futhark_context *ctx, struct futhark_i32_2d **out0, struct futhark_f32_2d **out1, struct futhark_i32_1d **out2, const int64_t in0, const struct futhark_f32_2d *in1, const int64_t in2, const struct futhark_i32_1d *in3, const struct futhark_f32_1d *in4, const struct futhark_f32_2d *in5);
 
 // Miscellaneous
 int futhark_context_sync(struct futhark_context *ctx);

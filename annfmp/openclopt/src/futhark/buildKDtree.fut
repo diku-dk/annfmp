@@ -56,6 +56,16 @@ local let updateBounds [n] [d2] (level: i32) (median_dims: [n]i32) (median_vals:
         in  (ancestor_child, lubs_cur)
     in  res
 
+-- local let recomputeBoundsFromPoints [m][d]
+--     (input: [m][d]f32) (indir: [m]i32) (off: i64) (len: i64) : [d+d]f32 =
+--     let indir64 = (map (\x -> i64.i32 x) indir)
+--     let inds = indir64[off:off+len]
+--     let pts  = map (\ind -> input[ind]) inds
+--     let ptsT = transpose pts
+--     let lbs  = map (reduce_comm f32.min f32.highest) ptsT
+--     let ubs  = map (reduce_comm f32.max f32.lowest)  ptsT
+--     in lbs ++ ubs
+
 local let findClosestMed [n] (cur_dim: i32) (median_dims: [n]i32) (node_ind: i32) : i32 =
     let cur_node = node_ind
     let res_ind  = -1i32
@@ -123,6 +133,12 @@ let mkKDtree [m] [d] (height: i32) (q: i64)
                         let lubs_cur = updateBounds lev median_dims median_vals
                                                     node_ind (copy lubs)
                         let _ = trace lubs_cur
+                        -- let off = cur_offsets[i]
+                        -- let len = cur_shp[i]
+                        -- let lubs_cur =
+                        --     if len == 0
+                        --     then copy lubs
+                        --     else recomputeBoundsFromPoints input indir off len
                         -- chose dimension of highest spread
                         let diffs = map (\i -> f32.abs(lubs_cur[i+d] - lubs_cur[i])) (iota d)
                         let _ = trace diffs

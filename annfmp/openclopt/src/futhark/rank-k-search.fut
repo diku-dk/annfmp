@@ -103,7 +103,7 @@ def rankSearchBatch [m][n] (meds: [m]f32) (ks: [m]i32)
         in  (ks', shp', II1'', II1, A'', A, q+1, res')
   in res
 
-def computeMedianWithRankK (shp: []i64) (input: []f32) (offsets: []i64) (flagArray: []i64) (II1: []i64) = 
+def computeMedianWithRankK (shp: []i64) (input: []f32) (offsets: []i64) (flagArray: []i64) (II1: []i64) =
   let shp = map i32.i64 shp
   -- Calculating mins
   let scanned_mins = sgmscan f32.min f32.highest (map i32.i64 flagArray) input
@@ -114,14 +114,31 @@ def computeMedianWithRankK (shp: []i64) (input: []f32) (offsets: []i64) (flagArr
   let scanned_maxs = sgmscan f32.max f32.lowest (map i32.i64 flagArray) input
   let maxs_inds = map2 (\off len -> off + len - 1) offsets (map i64.i32 shp)
   let maxs = map (\i -> if i == -1 then 0 else scanned_maxs[i]) maxs_inds
-  
+
   -- Calculating means
-  let means = map2 (\min max -> (min + max) / 2) mins maxs --|> opague 
-  
+  let means = map2 (\min max -> (min + max) / 2) mins maxs
+
   -- Calculate ks
+  let size = length shp
   let ks = map (\ x -> i32.f32 (f32.floor ((f32.i32 x) / 2f32))) shp
 
+  -- Count how many elements in each segment are equal to the local max value
+  let is_max = map2 (\x i ->
+                    if x == maxs[i-1] then 1i32 else 0i32)
+                    input II1
+  let scanned_is_max = sgmscan (+) 0i32 (map i32.i64 flagArray) is_max
+  let num_max_vals = map (\i -> if i == -1 then 0 else scanned_is_max[i]) maxs_inds
+
+  -- If more than half the segment is equal to max
+  -- then move k to the left of the block to allow a nicer split
+  let realks = map3 (\k s cmax ->
+                      if s == 0 then k
+                      else if cmax > s / 2 then i32.max 0 (s - cmax - 1)
+                      else k)
+                    (ks :> [size]i32) (shp :> [size]i32) (num_max_vals :> [size]i32)
+
+
   let A = copy input
-  let med_vals = rankSearchBatch means ks shp (map i32.i64 II1) A
+  let med_vals = rankSearchBatch (means :> [size]f32) (realks :> [size]i32) (shp :> [size]i32) (map i32.i64 II1) A
   in med_vals
 
