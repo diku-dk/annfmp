@@ -375,7 +375,7 @@ void fit_extern( FUTHARK_CTX_INP *params, int profile ) {
 #endif
 
 	int32_t height_kd, num_inner_nodes, m_prime;
-	struct futhark_i32_1d* shp;
+	struct futhark_i64_1d* shp;
 	struct futhark_f32_2d* leaves;
     struct futhark_i32_1d* indir;
     struct futhark_i32_1d* orig2leaf;

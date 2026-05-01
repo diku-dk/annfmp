@@ -14,18 +14,19 @@ local let closestLog2 (p: i32) : i32 =
 
 -- This creates the segment ids for chosen_columns
 -- For instance shp = [1i64, 3i64] makes seg_ids become [0, 1, 1, 1]
-let computeSegIds (size: i64) (shp: []i64) : []i64 =
-    let offsets = exScan (+) 0 shp
-    let flagArray = scatter (replicate size 0i64) offsets (map (\_ -> 1i64) shp)
-    let II1 = scan (+) 0i64 flagArray
-    in map (\x -> x - 1) II1
+let computeSegIds [p] (m: i64) (shp: [p]i64) : [m]i64 =
+  let offsets = exScan (+) 0 shp  
+  -- Scatter ignores out of bounds writes -> https://futhark-lang.org/examples/gather-and-scatter.html
+  let inds = map (\i -> if shp[i] > 0 then offsets[i] else -1i64) (iota p)
+  let flags = scatter (replicate m (-1i64)) inds (iota p)
+  in scan (i64.max) 0i64 flags                           
 
 -- Implemented DPP Notes on II1, FlagArray, Offset etc
 let computeOffsetsFlagsII1 (size: i64) (nodes_this_lvl: i64) (shp: []i64) : ([]u32, []i64, []i64) =
-    let (B1, F1) =  mkIrFlagArray (map u32.i64 shp) 0 (iota nodes_this_lvl)
+    let (B1, F1) =  mkIrFlagArray (map u32.i64 shp) 0 (map (\x -> x+1) (iota nodes_this_lvl))
     let F1fix = F1 :> [size]i64
     let Farr = map bool.i64 F1
-    let II1 = map (\x -> x+1) (irsgmscan (+) 0 Farr F1) :> [size]i64
+    let II1 = segmented_scan (+) 0 Farr F1 :> [size]i64
     in (B1, F1fix, II1)
 
 -- CURRENTLY NOT IN USE

@@ -6,6 +6,44 @@ def imap2 as bs f = map2 f as bs
 
 def ones [q] 't (_xs: [q]t) = replicate q 1i32
 
+def sgmscan 't [n] (op: t->t->t) (ne: t)
+                   (flg : [n]i32) (arr : [n]t) : [n]t =
+  let flgs_vals =
+      scan ( \ (f1, x1) (f2,x2) ->
+              let f = f1 | f2 in
+              if f2 != 0 then (f, x2)
+              else (f, op x1 x2) )
+            (0,ne) (zip flg arr)
+  let (_, vals) = unzip flgs_vals
+  in vals
+
+-- | Segmented scan. Given a binary associative operator ``op`` with
+-- neutral element ``ne``, computes the inclusive prefix scan of the
+-- segments of ``as`` specified by the ``flags`` array, where `true`
+-- starts a segment and `false` continues a segment.
+def segmented_scan [n] 't
+                   (op: t -> t -> t)
+                   (ne: t)
+                   (flags: [n]bool)
+                   (as: [n]t) : *[n]t =
+  (unzip (scan (\(x_flag, x) (y_flag, y) ->
+                  ( x_flag || y_flag
+                  , if y_flag then y else x `op` y
+                  ))
+               (false, ne)
+               (zip flags as))).1
+
+def seg_red [n] 't
+                     (op: t -> t -> t)
+                     (ne: t)
+                     (flags: [n]bool)
+                     (as: [n]t) 
+                     (shp: []i64) =
+  let indsp1 = scan (+) 0 shp
+  let tmp = segmented_scan (op) ne flags as
+  in map2(\s ip1 -> if s <= 0 then ne else tmp[ip1-1]) shp indsp1
+
+
 -- meds: hopefully a decent estimate of the median values for each partition
 -- ks:   the k-th smallest element to be searched for each partition (starting from 1)
 -- shp, II1, A:  the rep of the iregular array: shape, II1-helper (plus 1) and flat data
@@ -103,8 +141,10 @@ def rankSearchBatch [m][n] (meds: [m]f32) (ks: [m]i32)
         in  (ks', shp', II1'', II1, A'', A, q+1, res')
   in res
 
-def computeMedianWithRankK (shp: []i64) (input: []f32) (offsets: []i64) (flagArray: []i64) (II1: []i64) =
+def computeMedianWithRankK [m] (shp: []i64) (input: [m]f32) (offsets: []i64) (flagArray: []i64) (II1: []i64) = 
+
   let shp = map i32.i64 shp
+
   -- Calculating mins
   let scanned_mins = sgmscan f32.min f32.highest (map i32.i64 flagArray) input
   let mins_inds = map2 (\off len -> off + len - 1) offsets (map i64.i32 shp)
@@ -114,31 +154,20 @@ def computeMedianWithRankK (shp: []i64) (input: []f32) (offsets: []i64) (flagArr
   let scanned_maxs = sgmscan f32.max f32.lowest (map i32.i64 flagArray) input
   let maxs_inds = map2 (\off len -> off + len - 1) offsets (map i64.i32 shp)
   let maxs = map (\i -> if i == -1 then 0 else scanned_maxs[i]) maxs_inds
-
+  
   -- Calculating means
-  let means = map2 (\min max -> (min + max) / 2) mins maxs
-
+  let means = map2 (\min max -> (min + max) / 2) mins maxs --|> opague 
+  
   -- Calculate ks
-  let size = length shp
   let ks = map (\ x -> i32.f32 (f32.floor ((f32.i32 x) / 2f32))) shp
 
-  -- Count how many elements in each segment are equal to the local max value
-  let is_max = map2 (\x i ->
-                    if x == maxs[i-1] then 1i32 else 0i32)
-                    input II1
-  let scanned_is_max = sgmscan (+) 0i32 (map i32.i64 flagArray) is_max
-  let num_max_vals = map (\i -> if i == -1 then 0 else scanned_is_max[i]) maxs_inds
-
-  -- If more than half the segment is equal to max
-  -- then move k to the left of the block to allow a nicer split
-  let realks = map3 (\k s cmax ->
-                      if s == 0 then k
-                      else if cmax > s / 2 then i32.max 0 (s - cmax - 1)
-                      else k)
-                    (ks :> [size]i32) (shp :> [size]i32) (num_max_vals :> [size]i32)
-
-
   let A = copy input
-  let med_vals = rankSearchBatch (means :> [size]f32) (realks :> [size]i32) (shp :> [size]i32) (map i32.i64 II1) A
-  in med_vals
+  let med_vals = rankSearchBatch means ks shp (map i32.i64 II1) A
+  let max_1st = seg_red (f32.max) (-f32.inf) (map (bool.i64)flagArray) input (map(\x -> i64.i32 x) shp)
 
+  let index_arr = map3(\x i j -> if x == max_1st[i] then j else -1) input (map (\x -> x-1)II1) (iota m)
+  let change = scatter (copy input) index_arr (replicate m (-f32.inf))
+  let max_2nd = seg_red (f32.max) (-f32.inf) (map (bool.i64)flagArray) change (map(\x -> i64.i32 x) shp)
+  let med_vals_update = map (\x -> if med_vals[x] == max_1st[x] && max_2nd[x] != (-f32.inf) then max_2nd[x] else med_vals[x]) (iota (length med_vals))
+
+  in med_vals_update
