@@ -7,7 +7,8 @@ def configuration(parent_package='', top_path=None):
     config.add_subpackage('openmp', subpackage_path='openmp')
     config.add_subpackage('openmp/kdtree', subpackage_path='openmp/kdtree')
 
-    config.add_subpackage('openclopt', subpackage_path='openclopt')
+    config.add_subpackage('openclopt', subpackage_path='openclopt')    
+    config.add_subpackage('openclireg', subpackage_path='openclireg')
     
     return config
 

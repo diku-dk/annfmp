@@ -2,8 +2,7 @@ let sumSqrsSeq [d] (xs: [d]f32) (ys: [d]f32) : f32 =
     loop (res) = (0.0f32) for (x,y) in (zip xs ys) do
         let z = x-y in res + z*z
 
--- OLD VERSION
-let bruteForce [m][d][k] (query: [d]f32)
+let bruteForce [m][d][k] (query: [d]f32) 
                          (knns0: [k](i32,f32))
                          (beg: i32, refs : [m][d]f32)
                        : [k](i32,f32) =
@@ -11,7 +10,7 @@ let bruteForce [m][d][k] (query: [d]f32)
       for i < m do
         let dist = sumSqrsSeq query (refs[i]) in
         if dist > knns[k-1].1 then knns -- early exit
-        else let ref_ind = (i32.i64 i)+beg in
+        else let ref_ind = i+beg in
              let (_, _, knns') =
                loop (dist, ref_ind, knns) for j < k do
                  let cur_nn = knns[j].1  in
@@ -39,84 +38,29 @@ let sortPartSortedSeqs [k] (knn: [k](i32,f32)) : [k](i32,f32) =
         in  (knn_sort, beg', end')
   in  res
 
--- OLD VERSION
--- query: query point to be searched for
--- knn0:  initial knns
--- beg:   index pointing at beginning of leaf
--- refs:  2D list of point in leaf
-let bruteForcePar [m][d][k] (query: [d]f32)
+let bruteForcePar [m][d][k] (query: [d]f32) 
                          (knn0: [k](i32,f32))
                          (beg: i32, refs : [m][d]f32)
                        : [k](i32,f32) =
   let knn = copy knn0
-  let dists = map (sumSqrsSeq query) refs -- euclidian distances
+  let dists = map (sumSqrsSeq query) refs
   let cycle = true
   let j = 0i32
   let (_, knn, _, _) =
     loop (dists, knn, j, cycle)
-      while cycle && (j < (i32.i64 k)) do
+      while cycle && (j < k) do
         let (min_ind, min_val) =
-          reduce_comm (\ (i1,v1) (i2,v2) ->
+          reduce_comm (\ (i1,v1) (i2,v2) -> 
                         if v1 < v2 then (i1, v1) else
                         if v1 > v2 then (i2, v2) else
                         (if i1 <= i2 then i1 else i2, v1)
                       ) (m, f32.inf) (zip (iota m) dists)
-
-        in  if min_val < (knn[k-1-(i64.i32 j)].1)
+        
+        in  if min_val < (knn[k-1-j].1)
             then  let dists[min_ind] = f32.highest
-                  let knn[k-1-(i64.i32 j)] = (beg+(i32.i64 min_ind), min_val)
+                  let knn[k-1-j] = (beg+min_ind, min_val)
                   in  (dists, knn, j+1, true)
             else  (dists, knn, j, false)
-  let knn_sort = sortPartSortedSeqs knn
-  in  knn_sort
-
-
--- SEGMENTED VERSION
--- query: query point to be searched for
--- knn0:  Initial knns
--- beg:   Index pointing at beginning of leaf
--- len:   Length of the leaf
--- refs:  2D list of points
-
--- Result:  Sorted Knn
-
-let bruteForceSegPar [m][d][k] (query: [d]f32)
-                         (knn0: [k](i32,f32))
-                         (beg: i64)
-                         (len: i64)
-                         (avg_leafsize: i64)
-                         (ref_pts: [m][d]f32)
-                       : [k](i32,f32) =
-  let B = avg_leafsize
-  let knn = copy knn0
-  let visited = replicate k (-1i64) 
-  let cycle = true
-  let j = 0i32
-  let (_, knn, _, _) =
-    loop (visited, knn, j, cycle)
-      while cycle && (j < (i32.i64 k)) do
-        let (min_ind, min_val) =
-          map (\li ->
-          loop (midx, mval) = (len, f32.inf)
-          for i < (len + B - 1)/B do
-            let pt_idx = i * B + li
-            let seen = loop found = false for vi < k do
-                           found || (visited[vi] == pt_idx)
-            in if pt_idx < len && !seen
-              then let dis = sumSqrsSeq query ref_pts[beg + pt_idx]
-                in if dis < mval then (pt_idx, dis) else (midx, mval)
-              else (midx, mval)
-          ) (iota B) |> reduce_comm (\ (i1,v1) (i2,v2) -> if v1 <= v2 then (i1,v1) else (i2,v2)) (len, f32.inf)
---          reduce_comm (\ (i1,v1) (i2,v2) ->
---                        if v1 < v2 then (i1, v1) else
---                        if v1 > v2 then (i2, v2) else
---                        (if i1 <= i2 then i1 else i2, v1)
---                      ) (len, f32.inf) (zip (iota len) dists)
-        in  if min_val < (knn[k-1-(i64.i32 j)].1)
-            then  let visited[i64.i32 j] = min_ind
-                  let knn[k-1-(i64.i32 j)] = (i32.i64 beg + i32.i64 min_ind, min_val)
-                  in  (visited, knn, j+1, true)
-            else  (visited, knn, j, false)
   let knn_sort = sortPartSortedSeqs knn
   in  knn_sort
 

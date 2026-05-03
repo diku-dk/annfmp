@@ -20,7 +20,8 @@ typedef struct futhark_ctx_inp {
     int debug;
 
     int kk;
-    int leaf_size;
+    //int leaf_size;
+	int height;
 	int hImageA;
 	int wImageA;
 	int cImage;
@@ -48,7 +49,8 @@ typedef struct futhark_ctx_inp_tp {
     int32_t debug;
 
     int32_t kk;
-    int32_t leaf_size;
+    //int32_t leaf_size;
+	int32_t height;
 	int32_t hImageA;
 	int32_t wImageA;
 	int32_t cImage;
@@ -99,7 +101,8 @@ void pair_init(
         int psize,
         int dim_reduced,
         int n_subset,
-        int leaf_size,
+        //int leaf_size,
+		int height,
         int seed,
 		int platform_id,
         int device_id      // input ends

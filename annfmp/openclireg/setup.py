@@ -29,7 +29,7 @@ def configuration(parent_package='', top_path=None):
 
     from numpy.distutils.misc_util import Configuration
 
-    config = Configuration('openclopt', parent_package, top_path)
+    config = Configuration('openclireg', parent_package, top_path)
     
     # FLOAT version
     config.add_extension("_wrapper_float", 

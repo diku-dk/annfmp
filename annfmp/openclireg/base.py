@@ -16,14 +16,14 @@ except Exception as e:
     print("Could not import Swig object: {}".format(str(e)))
 
 
-class ANNFieldPropKDTreeOpenCLOPT:
+class ANNFieldPropKDTreeOpenCLIREG:
     def __init__(
         self,
         n_neighbors=3,
         psize=8,
         dim_reduced=5,
         n_subset=1000,
-        leaf_size=64,
+        height=8,
         n_jobs=-1,
         select_best_nn=True,
         verbose=1,
@@ -36,7 +36,7 @@ class ANNFieldPropKDTreeOpenCLOPT:
         self.psize = psize
         self.dim_reduced = dim_reduced
         self.n_subset = n_subset
-        self.leaf_size = leaf_size
+        self.height = height
         self.n_jobs = n_jobs
         self.select_best_nn = select_best_nn
         self.verbose = verbose
@@ -100,12 +100,12 @@ class ANNFieldPropKDTreeOpenCLOPT:
             self.psize,
             self.dim_reduced,
             self.n_subset,
-            self.leaf_size,
+            self.height,
             self.seed,
             self.platform_id,
             self.device_id,
         )
-        self._get_wrapper_module().fit_extern(self.wrapper_futhark_ctxinp, 0)
+        self._get_wrapper_module().fit_extern(self.wrapper_futhark_ctxinp, 1)
         self._get_wrapper_module().pair_free(self.wrapper_futhark_ctxinp)
 
         self._timers["futhark"] = time.time() - tstart
