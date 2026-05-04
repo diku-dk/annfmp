@@ -85,8 +85,8 @@ let bruteForceParIreg [m][d][k]
     for qq < (len + avg_leafsize - 1) / avg_leafsize do
       let offset = qq * avg_leafsize
       let fdist q = 
-            let ind = offset + q
-            in  if ind < len 
+            let ind = offset + q + beg
+            in  if ind < len + beg
                 then sumSqrsSeq query refs[ind]
                 else f32.highest
       -- let dists = map fdist (iota avg_leafsize)
@@ -117,7 +117,7 @@ let bruteForceParIreg [m][d][k]
                           ) (i32.highest, f32.highest)
 
             in  if min_val < (knn[k-1-(i64.i32 j)].1)
-                then  let dists[min_ind] = f32.highest
+                then  let dists[min_ind-(i32.i64 offset)] = f32.highest
                       let knn[k-1-(i64.i32 j)] = (min_ind + i32.i64 beg, min_val)
                       in  (dists, knn, j+1, true)
                 else  (dists, knn, j, false)
@@ -140,7 +140,7 @@ let bruteForceSegPar [m][d][k] (query: [d]f32)
                          (avg_leafsize: i64)
                          (ref_pts: [m][d]f32)
                        : [k](i32,f32) = #[unsafe]
-  let B = 256 -- avg_leafsize
+  let B = avg_leafsize -- avg_leafsize
   let knn = copy knn0
   let visited = replicate k (-1i64) 
   let cycle = true

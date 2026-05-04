@@ -4,6 +4,7 @@ import "buildKDtree"
 import "brute-force"
 import "kd-traverse"
 import "util"
+import "cos-plays/brute-force-cos"
 
 def imap2intra f as bs =
   #[incremental_flattening(only_intra)] map2 f as bs
@@ -178,7 +179,7 @@ let findNaturalLeaves [m][d][q][p][n] (k: i64)
   let knns0 = imap2intra (\leaf_ind query ->
                       let beg = leaf_offsets[leaf_ind]
                       let len = shp[leaf_ind]
-                      in  bruteForceSegPar query
+                      in  bruteForceParIreg query
                           (replicate k (-1i32, f32.highest))
                           beg len avg_leafsize ref_pts
                     ) query_leaves queries
@@ -407,7 +408,7 @@ let propagate [m][d][p][nr][nc][k]
                      let leaf_ind = u_leafs[q]
                      let beg = leaf_offsets[i64.i32 leaf_ind]
                      let len = shp[i64.i32 leaf_ind]
-                     in bruteForceSegPar query knn beg len avg_leafsize ref_pts
+                     in bruteForceParIreg query knn beg len avg_leafsize ref_pts
              ) n_leavess to_search_leavess cur_nodes queries[i]
 
       let knns[i] = new_knn_row
