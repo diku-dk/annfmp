@@ -1,5 +1,6 @@
 .venv
 .venv*
+venv/
 *.log
 experiments/temp/
 experiments/results/

@@ -16,7 +16,7 @@ except Exception as e:
     print("Could not import Swig object: {}".format(str(e)))
 
 
-class ANNFieldPropKDTreeOpenCLIREG:
+class ANNFieldPropKDTreeOpenCLIRREG:
     def __init__(
         self,
         n_neighbors=3,

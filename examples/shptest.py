@@ -4,15 +4,15 @@ import numpy
 
 from annfmp import ANNField
 
-# compute ANN field with openclopt
-print("Computing ANN field with openclopt ...")
-modelOpencl = ANNField(
+# compute ANN field with openclirreg
+print("Computing ANN field with openclirreg ...")
+modelOpenclirreg = ANNField(
     n_neighbors=8,
     psize=8,
     dim_reduced=40,
     height=9,
     n_subset=1000,
-    algorithm="openclopt",
+    algorithm="openclirreg",
     propagate=True,
     select_best_nn=True,
     verbose=1,
@@ -20,15 +20,15 @@ modelOpencl = ANNField(
     n_jobs=16,
 )
 
-# compute ANN field with openmp
-print("\nComputing ANN field with openmp ...")
-modelOpenmp = ANNField(
+# compute ANN field with openclopt
+print("Computing ANN field with openclopt...")
+modelOpenclopt = ANNField(
     n_neighbors=8,
     psize=8,
     dim_reduced=40,
     leaf_size=128,
     n_subset=1000,
-    algorithm="openmp",
+    algorithm="openclopt",
     propagate=True,
     select_best_nn=True,
     verbose=1,
@@ -47,11 +47,20 @@ for x in range(5, 7, 2):
     print("Shape of image A: {}".format(image_a.shape))
     print("Shape of image B: {}".format(image_b.shape))
 
-    nn_indices_opencl = modelOpencl.fit(image_a, image_b)
+    nn_indices_openclirreg = modelOpenclirreg.fit(image_a, image_b)
+
+    nn_indices_openclopt = modelOpenclopt.fit(image_a, image_b)
+
 
     # compute score
-    print("Computing OpenCL overall score ...")
-    patches_a_reconst = modelOpencl.patches_b[nn_indices_opencl]
-    diff = modelOpencl.patches_a.astype(numpy.float32) - patches_a_reconst.astype(numpy.float32)
-    l2Opencl = numpy.mean(numpy.linalg.norm(diff, axis=1))
-    print("Overall L2 score: {}".format(l2Opencl))
+    print("Computing OpenCLIRREG overall score ...")
+    patches_a_reconst = modelOpenclirreg.patches_b[nn_indices_openclirreg]
+    diff = modelOpenclirreg.patches_a.astype(numpy.float32) - patches_a_reconst.astype(numpy.float32)
+    l2Openclirreg = numpy.mean(numpy.linalg.norm(diff, axis=1))
+    print("OpenCLIRREG L2 score: {}".format(l2Openclirreg))
+
+    print("Computing OpenCLOPT overall score ...")
+    patches_a_reconst = modelOpenclopt.patches_b[nn_indices_openclopt]
+    diff = modelOpenclopt.patches_a.astype(numpy.float32) - patches_a_reconst.astype(numpy.float32)
+    l2Openclopt = numpy.mean(numpy.linalg.norm(diff, axis=1))
+    print("OpenCLOPT L2 score: {}".format(l2Openclopt))
