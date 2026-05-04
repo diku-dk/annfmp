@@ -9,6 +9,8 @@ def configuration(parent_package='', top_path=None):
 
     config.add_subpackage('openclopt', subpackage_path='openclopt')
     config.add_subpackage('openclirreg', subpackage_path='openclirreg')
+    config.add_subpackage('rann', subpackage_path='rann')
+
 
     return config
 

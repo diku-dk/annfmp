@@ -9,6 +9,7 @@ from .naive import ANNFieldPropKDTreeNaive
 from .openmp import ANNFieldPropKDTreeOpenMP
 from .openclopt import ANNFieldPropKDTreeOpenCLOPT
 from .openclirreg import ANNFieldPropKDTreeOpenCLIRREG
+from .rann import ANNFieldPropKDTreeRANN
 
 
 class ANNField:
@@ -73,7 +74,7 @@ class ANNField:
 
     def fit(self, image_a, image_b):
 
-        if self.algorithm not in ["sklearn", "naive", "openmp", "openclopt", "openclirreg"]:
+        if self.algorithm not in ["sklearn", "naive", "openmp", "openclopt", "openclirreg", "rann"]:
             raise Exception("Unknown algorithm '{}'!".format(self.algorithm))
 
         if self.algorithm == "sklearn":
@@ -138,6 +139,21 @@ class ANNField:
         elif self.algorithm == "openclirreg":
 
             self._model = ANNFieldPropKDTreeOpenCLIRREG(
+                n_neighbors=self.n_neighbors,
+                psize=self.psize,
+                dim_reduced=self.dim_reduced,
+                n_subset=self.n_subset,
+                height=self.height,
+                n_jobs=self.n_jobs,
+                select_best_nn=self.select_best_nn,
+                verbose=self.verbose,
+                seed=self.seed,
+            )
+            nn_indices = self._model.fit(image_a, image_b)
+
+        elif self.algorithm == "rann":
+
+            self._model = ANNFieldPropKDTreeRANN(
                 n_neighbors=self.n_neighbors,
                 psize=self.psize,
                 dim_reduced=self.dim_reduced,
