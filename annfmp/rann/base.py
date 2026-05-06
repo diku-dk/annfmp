@@ -105,6 +105,29 @@ class ANNFieldPropKDTreeRANN:
         self._get_wrapper_module().fit_extern(self.wrapper_futhark_ctxinp, self.verbose)
         self._get_wrapper_module().pair_free(self.wrapper_futhark_ctxinp)
 
+        # Compute distances
+        nn_indices = nn_indices.reshape(-1, self.n_neighbors)
+
+        patches_a_full = self.patches_a.astype(numpy.float32)
+        patches_b_full = self.patches_b.astype(numpy.float32)
+
+        nn_distances = numpy.full(
+            nn_indices.shape,
+            numpy.inf,
+            dtype=numpy.float32,
+        )
+
+        for j in range(self.n_neighbors):
+            chosen_j = nn_indices[:, j]
+
+            valid = (chosen_j >= 0) & (chosen_j < patches_b_full.shape[0])
+
+            diff = patches_a_full[valid] - patches_b_full[chosen_j[valid]]
+            nn_distances[valid, j] = numpy.linalg.norm(diff, axis=1)
+
+        self.nn_indices = nn_indices
+        self.nn_distances = nn_distances
+
         self._timers["futhark"] = time.time() - tstart
 
         self._get_wrapper_module().free_extern(self.wrapper_futhark_ctxinp)

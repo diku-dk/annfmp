@@ -1,5 +1,5 @@
 #!/bin/bash
-cd openclirreg/src/futhark
+cd annfmp/openclirreg/src/futhark
 futhark pkg sync
 futhark cuda driverKNN.fut --library
 cd ..
