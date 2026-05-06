@@ -306,12 +306,11 @@ let exactKnn [m][q][d][n][k][p]
           -- do brute force
           let knns' =
             imap3intra (\query knn leaf_ind ->
-                        if leaf_ind < i32.i64 num_leaves
-                        then
-                          let beg = leaf_offsets[i64.i32 leaf_ind]
-                          let len = shp[i64.i32 leaf_ind]
-                          in bruteForceSegPar query knn beg len avg_leafsize ref_pts
-                        else knn
+                        let is_valid = leaf_ind < i32.i64 num_leaves
+                        let beg = if (!is_valid) then 0 else leaf_offsets[i64.i32 leaf_ind]
+                        let len = if (!is_valid) then 0 else shp[i64.i32 leaf_ind]
+                        let result = bruteForceParIreg query knn beg len avg_leafsize ref_pts
+                        in if (is_valid) then result else knn
                     ) queries knns new_leaves
             |> opaque
 
@@ -381,7 +380,7 @@ let propagate [m][d][p][nr][nc][k]
                 let n_inds = 0i32
 
                 let (n_inds, u_leafs) =
-                  loop (n_inds, u_leafs) 
+                  loop (n_inds, u_leafs)
                     for q < k do
                       let par_ind = estimateIndex (i32.i64 nr) (i32.i64 nc) indir orig2leaf (par_inds[q])
                       let not_found = par_ind != nat_leaf
