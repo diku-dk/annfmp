@@ -123,10 +123,17 @@ class ANNFieldPropKDTreeRANN:
             valid = (chosen_j >= 0) & (chosen_j < patches_b_full.shape[0])
 
             diff = patches_a_full[valid] - patches_b_full[chosen_j[valid]]
-            nn_distances[valid, j] = numpy.linalg.norm(diff, axis=1)
+            nn_distances[valid, j] = numpy.sum(diff * diff, axis=1)
 
-        self.nn_indices = nn_indices
-        self.nn_distances = nn_distances
+        best_j = numpy.argmin(nn_distances, axis=1)
+        best_indices = nn_indices[numpy.arange(n_query), best_j]
+        best_distances = nn_distances[numpy.arange(n_query), best_j]
+
+        self.nn_indices_all = nn_indices
+        self.nn_distances_all = nn_distances
+
+        self.nn_indices = best_indices
+        self.nn_distances = best_distances
 
         self._timers["futhark"] = time.time() - tstart
 
@@ -148,7 +155,7 @@ class ANNFieldPropKDTreeRANN:
             )
             print("-----------------------------------------")
 
-        return nn_indices[:, 0].flatten()
+        return best_indices.flatten()
 
     def _get_wrapper_module(self):
         """ Returns the corresponding swig
