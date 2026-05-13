@@ -51,6 +51,8 @@ modelRANN = ANNField(
     verbose=1,
     seed=0,
     n_jobs=16,
+    tval=1,
+    supercharge=False,
 )
 
 flags = []

@@ -44,8 +44,9 @@ void pair_init(
 		int* indices,
 		int n_query_indices,
 		int n_neighbors,
+        int height,
 		int tval,
-        int height
+        int supercharge
 ) {
     if (d_refer != d_query) {
         fprintf(stderr, "RANN error: reference dim %d != query dim %d\n",
@@ -62,6 +63,7 @@ void pair_init(
     }
 
 	params->tval = tval;
+    params->supercharge = supercharge;
     params->k = (int64_t)n_neighbors;
     params->height = height;
 
@@ -139,7 +141,8 @@ void fit_extern( FUTHARK_CTX_INP *params, int profile ) {
 	    struct timeval t_start, t_end, t_diff;
       	gettimeofday(&t_start, NULL);
 
-		s+= futhark_entry_main(
+		if (params->supercharge == 1) {
+            s+= futhark_entry_mainSuper(
             fut_ctx,
             &knn_inds,
             params->tval,
@@ -147,7 +150,18 @@ void fit_extern( FUTHARK_CTX_INP *params, int profile ) {
             params->height,
             refer_pts,
             query_pts
-        );
+            );
+        } else {
+            s+= futhark_entry_main(
+                fut_ctx,
+                &knn_inds,
+                params->tval,
+                params->k,
+                params->height,
+                refer_pts,
+                query_pts
+            );
+        }
 
 		//futhark_context_sync(fut_ctx);
 		cuCtxSynchronize();
@@ -159,7 +173,8 @@ void fit_extern( FUTHARK_CTX_INP *params, int profile ) {
 		printf("RANN knn computation: %lu microsecs\n", elapsed);
 
 	} else {
-		s += futhark_entry_main(
+		if (params->supercharge == 1) {
+            s+= futhark_entry_mainSuper(
             fut_ctx,
             &knn_inds,
             params->tval,
@@ -167,7 +182,18 @@ void fit_extern( FUTHARK_CTX_INP *params, int profile ) {
             params->height,
             refer_pts,
             query_pts
-        );
+            );
+        } else {
+            s+= futhark_entry_main(
+                fut_ctx,
+                &knn_inds,
+                params->tval,
+                params->k,
+                params->height,
+                refer_pts,
+                query_pts
+            );
+        }
 	}
 	if (s != 0) {
         fprintf(stderr,

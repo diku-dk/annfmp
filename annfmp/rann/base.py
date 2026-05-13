@@ -30,6 +30,8 @@ class ANNFieldPropKDTreeRANN:
         seed=0,
         platform_id=0,
         device_id=0,
+        tval=1,
+        supercharge=False,
     ):
 
         self.n_neighbors = n_neighbors
@@ -43,6 +45,8 @@ class ANNFieldPropKDTreeRANN:
         self.seed = seed
         self.platform_id = platform_id
         self.device_id = device_id
+        self.tval = tval
+        self.supercharge = supercharge
 
     def fit(self, image_a, image_b):
 
@@ -100,8 +104,9 @@ class ANNFieldPropKDTreeRANN:
             refer_pts,
             query_pts,
             nn_indices,
-            1,
             self.height,
+            self.tval,
+            self.supercharge,
         )
         self._get_wrapper_module().fit_extern(self.wrapper_futhark_ctxinp, self.verbose)
         self._get_wrapper_module().pair_free(self.wrapper_futhark_ctxinp)

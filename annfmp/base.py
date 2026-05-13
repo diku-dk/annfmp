@@ -27,6 +27,8 @@ class ANNField:
         select_best_nn=True,
         verbose=1,
         seed=0,
+        tval=1,
+        supercharge=False,
     ):
 
         self.n_neighbors = n_neighbors
@@ -41,6 +43,8 @@ class ANNField:
         self.select_best_nn = select_best_nn
         self.verbose = verbose
         self.seed = seed
+        self.tval = tval
+        self.supercharge = supercharge
 
     def get_params(self, deep=True):
         """ Returns the parameters of the model
@@ -59,6 +63,8 @@ class ANNField:
             "select_best_nn": self.select_best_nn,
             "verbose": self.verbose,
             "seed": self.seed,
+            "tval": self.tval,
+            "supercharge": self.supercharge,
         }
 
         return params
@@ -163,6 +169,8 @@ class ANNField:
                 select_best_nn=self.select_best_nn,
                 verbose=self.verbose,
                 seed=self.seed,
+                tval = self.tval,
+                supercharge= self.supercharge,
             )
             nn_indices = self._model.fit(image_a, image_b)
 

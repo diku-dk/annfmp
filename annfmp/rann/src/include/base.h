@@ -16,6 +16,7 @@ typedef struct futhark_ctx_inp {
 	// unless otherwise specified by '_host', all arrays reside on GPU
 	void*   fut_ctx;         // struct futhark_context*
 	int32_t tval;
+	int32_t supercharge;
     int64_t k;
 	int32_t height;
 
@@ -52,8 +53,9 @@ void pair_init(
 		int n_query_indices,
 
 		int n_neighbors,
+		int height,
 		int tval,
-		int height
+		int supercharge
 	);
 
 #endif /* INCLUDE_BASE_H_ */

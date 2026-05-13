@@ -150,5 +150,8 @@ def superRANN2 [n] [d] (Tval: i32) (k: i64) (points: [n][d]f32) =
   in (super_knn_inds)
 
 
-def main [m] [n] [d] (Tval: i32) (k: i64) (h: i32) (test_set: [m][d]f32) (queries: [n][d]f32) =
+entry main [m] [n] [d] (Tval: i32) (k: i64) (h: i32) (test_set: [m][d]f32) (queries: [n][d]f32) =
   RANN Tval k h test_set queries
+
+entry mainSuper [m] [n] [d] (Tval: i32) (k: i64) (h: i32) (test_set: [m][d]f32) (queries: [n][d]f32) =
+  superRANN Tval k h test_set queries
