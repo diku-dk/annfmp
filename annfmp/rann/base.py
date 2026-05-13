@@ -101,6 +101,7 @@ class ANNFieldPropKDTreeRANN:
             query_pts,
             nn_indices,
             1,
+            self.height,
         )
         self._get_wrapper_module().fit_extern(self.wrapper_futhark_ctxinp, self.verbose)
         self._get_wrapper_module().pair_free(self.wrapper_futhark_ctxinp)

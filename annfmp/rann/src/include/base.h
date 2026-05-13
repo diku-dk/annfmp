@@ -17,6 +17,7 @@ typedef struct futhark_ctx_inp {
 	void*   fut_ctx;         // struct futhark_context*
 	int32_t tval;
     int64_t k;
+	int32_t height;
 
     int32_t n_refer;
     int32_t n_query;
@@ -51,7 +52,8 @@ void pair_init(
 		int n_query_indices,
 
 		int n_neighbors,
-		int tval
+		int tval,
+		int height
 	);
 
 #endif /* INCLUDE_BASE_H_ */

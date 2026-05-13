@@ -44,7 +44,8 @@ void pair_init(
 		int* indices,
 		int n_query_indices,
 		int n_neighbors,
-		int tval
+		int tval,
+        int height
 ) {
     if (d_refer != d_query) {
         fprintf(stderr, "RANN error: reference dim %d != query dim %d\n",
@@ -62,6 +63,7 @@ void pair_init(
 
 	params->tval = tval;
     params->k = (int64_t)n_neighbors;
+    params->height = height;
 
     params->n_refer = n_refer;
     params->n_query = n_query;
@@ -142,6 +144,7 @@ void fit_extern( FUTHARK_CTX_INP *params, int profile ) {
             &knn_inds,
             params->tval,
             params->k,
+            params->height,
             refer_pts,
             query_pts
         );
@@ -161,6 +164,7 @@ void fit_extern( FUTHARK_CTX_INP *params, int profile ) {
             &knn_inds,
             params->tval,
             params->k,
+            params->height,
             refer_pts,
             query_pts
         );
