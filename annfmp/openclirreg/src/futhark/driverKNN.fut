@@ -309,8 +309,8 @@ let exactKnn [m][q][d][n][k][p]
                           let is_valid = leaf_ind < i32.i64 num_leaves
                           let beg = if (!is_valid) then 0 else leaf_offsets[i64.i32 leaf_ind]
                           let len = if (!is_valid) then 0 else shp[i64.i32 leaf_ind]
-                          let result = bruteForceSegPar query knn beg len avg_leafsize ref_pts
-                          in if (!is_valid) then result else knn
+                          let result = bruteForceParIreg query knn beg len avg_leafsize ref_pts
+                          in if (is_valid) then result else knn
                     ) queries knns new_leaves
             |> opaque
 
