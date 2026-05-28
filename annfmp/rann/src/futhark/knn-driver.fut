@@ -7,19 +7,19 @@ import "kdTreeIrregularRankK"
 --- Breaking the image into patches ---
 ---------------------------------------
 entry mkImgPatches [h][w][c] (p: i32) (img: [h][w][c]i32) : [][]u8 =
-  let n_cols = w - p + 1
-  let n_rows = h - p + 1
-  let ppc = p*p*c
+  let n_cols = (i32.i64 w) - p + 1
+  let n_rows = (i32.i64 h) - p + 1
+  let ppc = p*p*(i32.i64 c)
   let n_all  = n_cols*n_rows
 
-  let mkPatch ii jj = 
-  	tabulate_2d p p
+  let mkPatch ii jj =
+  	tabulate_2d (i64.i32 p) (i64.i32 p)
   		(\i j ->
   			map (\k -> u8.i32 (img[ii+i, jj+j, k])) (iota c)
   		)
-  let res5d = tabulate_2d n_rows n_cols mkPatch
-  let res2d = map (\(patch: [p][p][c]u8) -> (flatten (flatten patch)) :> [ppc]u8)
-  				        ( (flatten res5d) :> [n_all][p][p][c]u8)
+  let res5d = tabulate_2d (i64.i32 n_rows) (i64.i32 n_cols) mkPatch
+  let res2d = map (\(patch: [i64.i32 p][i64.i32 p][c]u8) -> (flatten (flatten patch)) :> [i64.i32 ppc]u8)
+  				        ( (flatten res5d) :> [i64.i32 n_all][i64.i32 p][i64.i32 p][c]u8)
   in  res2d
 
 ----------------------------------------------
@@ -32,53 +32,54 @@ entry reducePatchDim [n][d][d_red] (img: [n][d]u8) (comps: [d_red][d]f32) (means
            ) comps
       ) img
 
+
+
 ----------------------------------------------
 --- Selecting the best NN from large patch ---
 ----------------------------------------------
 
-entry selectBestNN [n][w1][w2][h1][h2][c]
+entry selectBestNN [n][w1][w2][h1][h2][c][kk]
                     (p: i32) (knn_inds: [n][kk]i32)
                     (imgA: [h1][w1][c]i32) (imgB: [h2][w2][c]i32)
                   : ([n]i32, [n]f32, f32) =
-  let n_colsA = w1 - p + 1
+  let n_colsA = i32.i64 w1 - p + 1
   --let n_rowsA = h1 - p + 1
-  let n_colsB = w2 - p + 1
+  let n_colsB = i32.i64 w2 - p + 1
   --let n_rowsB = h2 - p + 1
-  let patch_len = p*p*c
+  let patch_len = p*p*i32.i64 c
   let (nn_inds, nn_dsts) = unzip <|
-    map2(\knns indA -> 
+    map2(\knns indA ->
           let y = indA / n_colsA
           let x = indA - y * n_colsA
           let query = map (\ ijk ->
-                            let ij = ijk / c
-                            let k  = ijk - ij*c
+                            let ij = ijk / i32.i64 c
+                            let k  = ijk - ij*i32.i64 c
                             let i = ij / p
                             let j = ij - i*p
                             in  f32.i32 (imgA[y+i, x+j, k])
-                          ) (iota patch_len)
+                          ) (map i32.i64 (iota (i64.i32 patch_len)))
           let (nn_ind, nn_dst) = (-1i32, f32.inf) in
-          loop (nn_ind, nn_dst) for q < kk do
+          loop (nn_ind, nn_dst) for q < i32.i64 kk do
             let indB = knns[q]
             let ii = indB / n_colsB
             let jj = indB - ii * n_colsB
             let dst = f32.sum <|
               map (\ ijk ->
-                    let ij = ijk / c
-                    let k  = ijk - ij*c
+                    let ij = ijk / i32.i64 c
+                    let k  = ijk - ij*i32.i64 c
                     let i = ij / p
                     let j = ij - i*p
                     let b_v = f32.i32 (imgB[ii+i, jj+j, k])
                     let a_v = query[ijk]
                     let d = b_v - a_v
                     in  d*d
-                  ) (iota patch_len)
+                  ) (map i32.i64 (iota (i64.i32 patch_len)))
             in  if dst < nn_dst
                 then (indB, dst)
                 else (nn_ind, nn_dst)
-        ) knn_inds (iota n)
+        ) knn_inds (map i32.i64 (iota n))
   let err = reduce (+) 0.0f32 nn_dsts
   in  (nn_inds, nn_dsts, f32.sqrt err)
-
 
 def RANN [m] [n] [d] (Tval: i32) (k: i64) (h: i32) (test_set: [m][d]f32) (queries: [n][d]f32) =
   -- Step 1: shift points
