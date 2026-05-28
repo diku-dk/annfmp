@@ -89,15 +89,12 @@ let bruteForceParIreg [m][d][k]
             in  if ind < len + beg
                 then sumSqrsSeq query refs[ind]
                 else f32.highest
-      -- let dists = map fdist (iota avg_leafsize)
       let dists = map fdist (0 ... B-1) ++
                   map fdist (B ... 2*B-1) ++
                   map fdist (2*B ... 3*B-1) ++
                   map fdist (3*B ... 4*B-1)
-      -- ^ euclidian distances; ToDo: chunk it to B
       let cycle = true
       let j = 0i32
-      --
       let (_, knn, _, _) =
         loop (dists, knn, j, cycle)
           while cycle && (j < (i32.i64 k)) do
@@ -107,7 +104,6 @@ let bruteForceParIreg [m][d][k]
                     let pt_idx = i * B + li
                     let dis = dists[pt_idx]
                     in if dis < mval then (i32.i64 (offset + pt_idx), dis) else (midx, mval)
-            --
             let (min_ind, min_val) = 
               map fmap (iota B) |>
               reduce_comm (\ (i1,v1) (i2,v2) ->
@@ -115,7 +111,6 @@ let bruteForceParIreg [m][d][k]
                             if v1 > v2 then (i2, v2) else
                             (if i1 <= i2 then i1 else i2, v1)
                           ) (i32.highest, f32.highest)
-
             in  if min_val < (knn[k-1-(i64.i32 j)].1)
                 then  let dists[min_ind-(i32.i64 offset)] = f32.highest
                       let knn[k-1-(i64.i32 j)] = (min_ind + i32.i64 beg, min_val)

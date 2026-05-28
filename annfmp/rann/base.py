@@ -65,26 +65,17 @@ class ANNFieldPropKDTreeRANN:
         self.image_a = numpy.ascontiguousarray(image_a).astype(numpy.int32)
         self.image_b = numpy.ascontiguousarray(image_b).astype(numpy.int32)
 
-        patches_a = self.patches_a.astype(numpy.float32)
-        patches_b = self.patches_b.astype(numpy.float32)
+        # columns and rows
+        self._n_cols = self.image_a.shape[0] - self.psize + 1
+        self._n_rows = self.image_a.shape[1] - self.psize + 1
 
-        query_pts = numpy.ascontiguousarray(
-            self._pca_model.transform(patches_a),
-            dtype=numpy.float32,
-        )
+        # number of patches
+        n_patches_a = self._n_cols * self._n_rows
 
-        refer_pts = numpy.ascontiguousarray(
-            self._pca_model.transform(patches_b),
-            dtype=numpy.float32,
-        )
-
-        n_query = query_pts.shape[0]
-        n_refer = refer_pts.shape[0]
-
-        nn_indices = numpy.zeros(
-            (n_query, self.n_neighbors),
-            dtype=numpy.int32,
-        )
+        # array that should contain the output after the propagation phase
+        # (it contains, for each patch, the K nearest neighbor indices)
+        nn_indices = numpy.zeros((n_patches_a), dtype=numpy.int32)
+        nn_distances = numpy.zeros((n_patches_a), dtype=numpy.float32)
 
         self._timers["python_overhead"] = time.time() - tstart
 
@@ -95,51 +86,28 @@ class ANNFieldPropKDTreeRANN:
 
         tstart = time.time()
 
-        refer_pts = numpy.ascontiguousarray(refer_pts, dtype=numpy.float32)
-        query_pts = numpy.ascontiguousarray(query_pts, dtype=numpy.float32)
-        nn_indices = numpy.ascontiguousarray(nn_indices, dtype=numpy.int32)
 
         self._get_wrapper_module().pair_init(
             self.wrapper_futhark_ctxinp,
-            refer_pts,
-            query_pts,
-            nn_indices,
+            self.image_a,
+            self.image_b,
+            numpy.ascontiguousarray(self._pca_model.components_).astype(numpy.float32),
+            numpy.ascontiguousarray(self._pca_model.mean_).astype(numpy.float32),
+            numpy.ascontiguousarray(nn_indices),
+            numpy.ascontiguousarray(nn_distances),
+            self.n_neighbors,
+            self.psize,
+            self.dim_reduced,
+            self.n_subset,
+            self.seed,
+            self.platform_id,
+            self.device_id,
             self.height,
             self.tval,
             self.supercharge,
         )
         self._get_wrapper_module().fit_extern(self.wrapper_futhark_ctxinp, self.verbose)
         self._get_wrapper_module().pair_free(self.wrapper_futhark_ctxinp)
-
-        # Compute distances
-        nn_indices = nn_indices.reshape(-1, self.n_neighbors)
-
-        patches_a_full = self.patches_a.astype(numpy.float32)
-        patches_b_full = self.patches_b.astype(numpy.float32)
-
-        nn_distances = numpy.full(
-            nn_indices.shape,
-            numpy.inf,
-            dtype=numpy.float32,
-        )
-
-        for j in range(self.n_neighbors):
-            chosen_j = nn_indices[:, j]
-
-            valid = (chosen_j >= 0) & (chosen_j < patches_b_full.shape[0])
-
-            diff = patches_a_full[valid] - patches_b_full[chosen_j[valid]]
-            nn_distances[valid, j] = numpy.sum(diff * diff, axis=1)
-
-        best_j = numpy.argmin(nn_distances, axis=1)
-        best_indices = nn_indices[numpy.arange(n_query), best_j]
-        best_distances = nn_distances[numpy.arange(n_query), best_j]
-
-        self.nn_indices_all = nn_indices
-        self.nn_distances_all = nn_distances
-
-        self.nn_indices = best_indices
-        self.nn_distances = best_distances
 
         self._timers["futhark"] = time.time() - tstart
 
@@ -161,7 +129,7 @@ class ANNFieldPropKDTreeRANN:
             )
             print("-----------------------------------------")
 
-        return best_indices.flatten()
+        return nn_indices.flatten()
 
     def _get_wrapper_module(self):
         """ Returns the corresponding swig

@@ -282,7 +282,6 @@ let exactKnn [m][q][d][n][k][p]
               (nat_leaves: *[n]i32)
               (knns:   *[n][k](i32,f32)) : (*[n][k](i32,f32), i32) =
   let (h, _, num_leaves) = getHeightPpl (i32.i64 q) (i32.i64 m)
-  let _ = trace num_leaves
   let leaf_offsets = exScan (+) 0i64 shp
   let avg_leafsize = (reduce (+) 0i64 shp) / length(shp)
 
@@ -298,12 +297,9 @@ let exactKnn [m][q][d][n][k][p]
           let wnns = map (\arr -> arr[k-1].1) knns
           let (new_leaves, new_stacks, new_dists) = unzip3 <|
             map2 (traverseOnce h kd_tree) (zip queries wnns) (zip3 last_leaves stacks dists)
-
           let n'' = map (\leaf_ind -> if leaf_ind < i32.i64 num_leaves then 1i32 else 0i32) new_leaves
                  |> reduce_comm (+) 0i32
                  |> opaque
-
-          -- do brute force
           let knns' =
             imap3intra (\query knn leaf_ind ->
                           let is_valid = leaf_ind < i32.i64 num_leaves
