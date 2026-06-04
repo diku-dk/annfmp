@@ -41,11 +41,11 @@ void pair_init(
 		int himageB, // 800
 		int wimageB, // 1920
 		int cimageB, // 3
-		float*  components,
-		int n_components, // 16
-		int d_components, // 192
-		float*  means,
-		int n_means, // 192
+		// float*  components,
+		// int n_components, // 16
+		// int d_components, // 192
+		// float*  means,
+		// int n_means, // 192
 		int *indices, // result
 		int n_indices,
 		float* distances, // result
@@ -84,14 +84,14 @@ void pair_init(
 	params->psize = psize;
 	params->patch_small = dim_reduced;
 	params->patch_large = params->psize * params->psize * params->cImage;
-	params->comps = components; // shape: [psize*psize*cImage][patch_small]
-	params->means = means;      // shape: [psize*psize*cImage]
+	// params->comps = components; // shape: [psize*psize*cImage][patch_small]
+	// params->means = means;      // shape: [psize*psize*cImage]
 
 
 	params->imgA = futhark_new_i32_3d(params->fut_ctx, imageA, himageA, wimageA, cimageA);
 	params->imgB = futhark_new_i32_3d(params->fut_ctx, imageB, himageB, wimageB, cimageA);
-	params->comps= futhark_new_f32_2d(params->fut_ctx, components, params->patch_small, params->patch_large);
-	params->means= futhark_new_f32_1d(params->fut_ctx, means, params->patch_large);
+	// params->comps= futhark_new_f32_2d(params->fut_ctx, components, params->patch_small, params->patch_large);
+	// params->means= futhark_new_f32_1d(params->fut_ctx, means, params->patch_large);
 
 	params->nn_inds_host = indices;   // shape: [(wimageA - psize + 1) * (himageA - psize + 1)]
 	params->nn_dsts_host =  // shape: [(wimageA - psize + 1) * (himageA - psize + 1)]
@@ -104,12 +104,12 @@ void pair_free( FUTHARK_CTX_INP *params ) {
 
     struct futhark_i32_3d* imgA   = (struct futhark_i32_3d*)params->imgA;
 	struct futhark_i32_3d* imgB   = (struct futhark_i32_3d*)params->imgB;
-	struct futhark_f32_2d* comps  = (struct futhark_f32_2d*)params->comps;
-	struct futhark_f32_1d* means  = (struct futhark_f32_1d*)params->means;
+	// struct futhark_f32_2d* comps  = (struct futhark_f32_2d*)params->comps;
+	// struct futhark_f32_1d* means  = (struct futhark_f32_1d*)params->means;
 
     int s = 0;
-	s += futhark_free_f32_1d(fut_ctx, means);
-	s += futhark_free_f32_2d(fut_ctx, comps);
+	// s += futhark_free_f32_1d(fut_ctx, means);
+	// s += futhark_free_f32_2d(fut_ctx, comps);
 	s += futhark_free_i32_3d(fut_ctx, imgA);
 	s += futhark_free_i32_3d(fut_ctx, imgB);
 
@@ -140,8 +140,8 @@ void fit_extern( FUTHARK_CTX_INP *params, int profile ) {
 	struct futhark_context_config* fut_ctx = (struct futhark_context_config*) params->fut_ctx;
 	struct futhark_i32_3d* imgA   = (struct futhark_i32_3d*)params->imgA;
 	struct futhark_i32_3d* imgB   = (struct futhark_i32_3d*)params->imgB;
-	struct futhark_f32_2d* comps  = (struct futhark_f32_2d*)params->comps;
-	struct futhark_f32_1d* means  = (struct futhark_f32_1d*)params->means;
+	// struct futhark_f32_2d* comps  = (struct futhark_f32_2d*)params->comps;
+	// struct futhark_f32_1d* means  = (struct futhark_f32_1d*)params->means;
 	int32_t* nn_inds_host = (int32_t*)params->nn_inds_host;
 	float*   nn_dsts_host = (float*  )params->nn_dsts_host;
 	const int32_t psize = params->psize;
@@ -176,15 +176,16 @@ void fit_extern( FUTHARK_CTX_INP *params, int profile ) {
       	gettimeofday(&t_start, NULL);
 
       	int s = 0;
+		// Used to be called patches_A
 		s += futhark_entry_mkImgPatches(fut_ctx, &patches_A, psize, imgA);
 		s += futhark_entry_reducePatchDim( fut_ctx, &query_pts //output
-										 , patches_A, comps, means // input
+										 , patches_A// input
 										 );
 		s += futhark_free_u8_2d(fut_ctx, patches_A);
 
 		s += futhark_entry_mkImgPatches(fut_ctx, &patches_B, psize, imgB);
 		s += futhark_entry_reducePatchDim( fut_ctx, &refer_pts //output
-										 , patches_B, comps, means // input
+										 , patches_B // input
 										 );
 		s += futhark_free_u8_2d(fut_ctx, patches_B);
 		//futhark_context_sync(fut_ctx);
@@ -203,13 +204,13 @@ void fit_extern( FUTHARK_CTX_INP *params, int profile ) {
 	} else {
 		futhark_entry_mkImgPatches(fut_ctx, &patches_A, psize, imgA);
 		futhark_entry_reducePatchDim( fut_ctx, &query_pts
-										 , patches_A, comps, means // input
+										 , patches_A // input
 		  						    );
 		futhark_free_u8_2d(fut_ctx, patches_A);
 
 		futhark_entry_mkImgPatches(fut_ctx, &patches_B, psize, imgB);
 		futhark_entry_reducePatchDim( fut_ctx, &refer_pts //output
-										 , patches_B, comps, means // input
+										 , patches_B // input
 									);
 		futhark_free_u8_2d(fut_ctx, patches_B);
     }

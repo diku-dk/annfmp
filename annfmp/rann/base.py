@@ -54,14 +54,14 @@ class ANNFieldPropKDTreeRANN:
 
         self._timers = collections.OrderedDict()
 
-        tstart = time.time()
-        self._pca_model = self._fit_pca_model(image_a, image_b)
-        self._timers["pca_fit"] = time.time() - tstart
+        #tstart = time.time()
+        #self._pca_model = self._fit_pca_model(image_a, image_b)
+        #self._timers["pca_fit"] = time.time() - tstart
         # print("pca fit")
         # print(self._timers['pca_fit'])
         # (needed for the swig module)
 
-        tstart = time.time()
+        #tstart = time.time()
         self.image_a = numpy.ascontiguousarray(image_a).astype(numpy.int32)
         self.image_b = numpy.ascontiguousarray(image_b).astype(numpy.int32)
 
@@ -91,8 +91,8 @@ class ANNFieldPropKDTreeRANN:
             self.wrapper_futhark_ctxinp,
             self.image_a,
             self.image_b,
-            numpy.ascontiguousarray(self._pca_model.components_).astype(numpy.float32),
-            numpy.ascontiguousarray(self._pca_model.mean_).astype(numpy.float32),
+            #numpy.ascontiguousarray(self._pca_model.components_).astype(numpy.float32),
+            #numpy.ascontiguousarray(self._pca_model.mean_).astype(numpy.float32),
             numpy.ascontiguousarray(nn_indices),
             numpy.ascontiguousarray(nn_distances),
             self.n_neighbors,
@@ -117,12 +117,10 @@ class ANNFieldPropKDTreeRANN:
             print("-----------------------------------------")
             print("--------------- RUNTIMES ----------------")
             print("-----------------------------------------")
-            print("PCA fit:\t\t{}".format(self._timers["pca_fit"]))
             print("Python overhead:\t{}".format(self._timers["python_overhead"]))
             print("Futhark:\t\t{}".format(self._timers["futhark"]))
             print(
                 "Total runtime:\t\t{}".format(
-                    self._timers["pca_fit"]
                     + self._timers["python_overhead"]
                     + self._timers["futhark"]
                 )

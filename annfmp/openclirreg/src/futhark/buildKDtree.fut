@@ -167,7 +167,7 @@ let mkKDtree [m] [d] (height: i32) (q: i64)
             let med_vals = computeMedianWithRankK cur_shp chosen_columns (map i64.u32 B1) F1fix II1
 
             --------- PARTITION2L -----------
-            let bools = map2 (\x seg -> x <= med_vals[seg]) chosen_columns seg_ids
+            let bools = map2 (\x seg -> x < med_vals[seg]) chosen_columns seg_ids
 
             let indir = map i64.i32 indir
             let (splitInds, (_, indir')) = partition2L bools 0i64 (cur_shp, indir)

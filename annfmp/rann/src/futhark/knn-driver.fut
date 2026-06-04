@@ -25,13 +25,8 @@ entry mkImgPatches [h][w][c] (p: i32) (img: [h][w][c]i32) : [][]u8 =
 ----------------------------------------------
 --- Reducing the dimensionality of patches ---
 ----------------------------------------------
-entry reducePatchDim [n][d][d_red] (img: [n][d]u8) (comps: [d_red][d]f32) (means: [d]f32) : [n][d_red]f32 =
-  map (\ (patch: [d]u8) ->
-        map(\ (comp: [d]f32) ->
-              f32.sum <| map3 (\p c m -> ( (f32.u8 p) - m ) * c) patch comp means
-           ) comps
-      ) img
-
+entry reducePatchDim [n][d] (img: [n][d]u8) : [n][d]f32 =
+   map (map f32.u8) img
 
 
 ----------------------------------------------
