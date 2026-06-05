@@ -173,8 +173,7 @@ let findNaturalLeaves [m][d][q][p][n] (k: i64)
   let avg_leafsize = (reduce (+) 0i64 shp) / length(shp)
 
   let query_leaves0 = map (findLeaf median_dims median_vals h) queries
-  let (query_leaves, query_inds) = sortQueriesByLeavesRadix (h+1) query_leaves0
-  let queries = gather2D queries query_inds
+  let query_leaves = copy query_leaves0
 
   let knns0 = imap2intra (\leaf_ind query ->
                       let beg = leaf_offsets[leaf_ind]
@@ -184,12 +183,10 @@ let findNaturalLeaves [m][d][q][p][n] (k: i64)
                           beg len avg_leafsize ref_pts
                     ) query_leaves queries
 
-  let dummy_inds = replicate n (replicate k (-1i32))
-  let dummy_vals = replicate n (replicate k f32.highest)
-  let (knns0_inds, knns0_vals) = unzip <| map unzip knns0
-  let knn_inds = scatter2D dummy_inds query_inds knns0_inds
-  let knn_vals = scatter2D dummy_vals query_inds knns0_vals
-  in  (knn_inds, knn_vals, query_leaves0)
+  let (knn_inds0, knn_vals0) = unzip <| map unzip knns0
+  let knn_inds = copy knn_inds0
+  let knn_vals = copy knn_vals0
+  in  (knn_inds, knn_vals, query_leaves)
 
 entry findNaturalLeavesFixK [m][d][q][p][n]
                           (ref_pts:  [m][d]f32)
@@ -376,7 +373,7 @@ let propagate [m][d][p][nr][nc][k]
                 let n_inds = 0i32
 
                 let (n_inds, u_leafs) =
-                  loop (n_inds, u_leafs) 
+                  loop (n_inds, u_leafs)
                     for q < k do
                       let par_ind = estimateIndex (i32.i64 nr) (i32.i64 nc) indir orig2leaf (par_inds[q])
                       let not_found = par_ind != nat_leaf
