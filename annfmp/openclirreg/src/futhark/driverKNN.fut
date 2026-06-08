@@ -151,7 +151,7 @@ entry buildKDtree [m][d] (height: i32) (input: [m][d]f32) =
     let num_inner_nodes = (1 << (height+1)) - 1
     let (leafs, shp, indir, median_dims, median_vals, clanc_eqdim) =
           mkKDtree height (i64.i32 num_inner_nodes) input
-    let (_, _, II1) = (computeOffsetsFlagsII1 m (i64.i32 num_inner_nodes + 1) shp)
+    let (_, _, II1) = (mkBFlagsII m (i64.i32 num_inner_nodes + 1) shp)
     let seg_ids = map (\x -> x - 1) II1
     let orig2leaf = scatter (replicate m (-1i32)) (map i64.i32 indir) (map i32.i64 seg_ids)
     in  (height, shp, num_inner_nodes, m, leafs, indir, orig2leaf, median_dims, median_vals, clanc_eqdim)
@@ -178,7 +178,7 @@ let findNaturalLeaves [m][d][q][p][n] (k: i64)
   let knns0 = imap2intra (\leaf_ind query ->
                       let beg = leaf_offsets[leaf_ind]
                       let len = shp[leaf_ind]
-                      in  bruteForceParIreg query
+                      in  bruteForceParIrreg query
                           (replicate k (-1i32, f32.highest))
                           beg len avg_leafsize ref_pts
                     ) query_leaves queries
@@ -302,7 +302,7 @@ let exactKnn [m][q][d][n][k][p]
                           let is_valid = leaf_ind < i32.i64 num_leaves
                           let beg = if (!is_valid) then 0 else leaf_offsets[i64.i32 leaf_ind]
                           let len = if (!is_valid) then 0 else shp[i64.i32 leaf_ind]
-                          let result = bruteForceParIreg query knn beg len avg_leafsize ref_pts
+                          let result = bruteForceParIrreg query knn beg len avg_leafsize ref_pts
                           in if (is_valid) then result else knn
                     ) queries knns new_leaves
             |> opaque
@@ -400,7 +400,7 @@ let propagate [m][d][p][nr][nc][k]
                      let leaf_ind = u_leafs[q]
                      let beg = leaf_offsets[i64.i32 leaf_ind]
                      let len = shp[i64.i32 leaf_ind]
-                     in bruteForceParIreg query knn beg len avg_leafsize ref_pts
+                     in bruteForceParIrreg query knn beg len avg_leafsize ref_pts
              ) n_leavess to_search_leavess cur_nodes queries[i]
 
       let knns[i] = new_knn_row

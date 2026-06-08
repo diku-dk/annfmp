@@ -37,7 +37,7 @@ def seg_red [n] 't
                      (op: t -> t -> t)
                      (ne: t)
                      (flags: [n]bool)
-                     (as: [n]t) 
+                     (as: [n]t)
                      (shp: []i64) =
   let indsp1 = scan (+) 0 shp
   let tmp = segmented_scan (op) ne flags as
@@ -141,7 +141,7 @@ def rankSearchBatch [m][n] (meds: [m]f32) (ks: [m]i32)
         in  (ks', shp', II1'', II1, A'', A, q+1, res')
   in res
 
-def computeMedianWithRankK [m] (shp: []i64) (input: [m]f32) (offsets: []i64) (flagArray: []i64) (II1: []i64) = 
+def computeMedianWithRankK [m] (shp: []i64) (input: [m]f32) (offsets: []i64) (flagArray: []i64) (II1: []i64) =
 
   let shp = map i32.i64 shp
 
@@ -154,20 +154,20 @@ def computeMedianWithRankK [m] (shp: []i64) (input: [m]f32) (offsets: []i64) (fl
   let scanned_maxs = sgmscan f32.max f32.lowest (map i32.i64 flagArray) input
   let maxs_inds = map2 (\off len -> off + len - 1) offsets (map i64.i32 shp)
   let maxs = map (\i -> if i == -1 then 0 else scanned_maxs[i]) maxs_inds
-  
+
   -- Calculating means
-  let means = map2 (\min max -> (min + max) / 2) mins maxs --|> opague 
-  
+  let means = map2 (\min max -> (min + max) / 2) mins maxs --|> opague
+
   -- Calculate ks
   let ks = map (\ x -> i32.f32 (f32.floor ((f32.i32 x) / 2f32))) shp
 
   let A = copy input
   let med_vals = rankSearchBatch means ks shp (map i32.i64 II1) A
-  let max_1st = seg_red (f32.max) (-f32.inf) (map (bool.i64)flagArray) input (map(\x -> i64.i32 x) shp)
+  -- let max_1st = seg_red (f32.max) (-f32.inf) (map (bool.i64)flagArray) input (map(\x -> i64.i32 x) shp)
 
-  let index_arr = map3(\x i j -> if x == max_1st[i] then j else -1) input (map (\x -> x-1)II1) (iota m)
-  let change = scatter (copy input) index_arr (replicate m (-f32.inf))
-  let max_2nd = seg_red (f32.max) (-f32.inf) (map (bool.i64)flagArray) change (map(\x -> i64.i32 x) shp)
-  let med_vals_update = map (\x -> if med_vals[x] == max_1st[x] && max_2nd[x] != (-f32.inf) then max_2nd[x] else med_vals[x]) (iota (length med_vals))
+  -- let index_arr = map3(\x i j -> if x == max_1st[i] then j else -1) input (map (\x -> x-1)II1) (iota m)
+  -- let change = scatter (copy input) index_arr (replicate m (-f32.inf))
+  -- let max_2nd = seg_red (f32.max) (-f32.inf) (map (bool.i64)flagArray) change (map(\x -> i64.i32 x) shp)
+  -- let med_vals_update = map (\x -> if med_vals[x] == max_1st[x] && max_2nd[x] != (-f32.inf) then max_2nd[x] else med_vals[x]) (iota (length med_vals))
 
-  in med_vals_update
+  in med_vals

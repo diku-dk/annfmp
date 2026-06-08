@@ -70,7 +70,7 @@ let bruteForcePar [m][d][k] (query: [d]f32)
   let knn_sort = sortPartSortedSeqs knn
   in  knn_sort
 
-let bruteForceParIreg [m][d][k] 
+let bruteForceParIrreg [m][d][k]
       (query: [d]f32)
       (knn0: [k](i32,f32))
       (beg: i64)
@@ -84,7 +84,7 @@ let bruteForceParIreg [m][d][k]
   loop knn = copy knn0
     for qq < (len + avg_leafsize - 1) / avg_leafsize do
       let offset = qq * avg_leafsize
-      let fdist q = 
+      let fdist q =
             let ind = offset + q + beg
             in  if ind < len + beg
                 then sumSqrsSeq query refs[ind]
@@ -104,7 +104,7 @@ let bruteForceParIreg [m][d][k]
                     let pt_idx = i * B + li
                     let dis = dists[pt_idx]
                     in if dis < mval then (i32.i64 (offset + pt_idx), dis) else (midx, mval)
-            let (min_ind, min_val) = 
+            let (min_ind, min_val) =
               map fmap (iota B) |>
               reduce_comm (\ (i1,v1) (i2,v2) ->
                             if v1 < v2 then (i1, v1) else
@@ -118,7 +118,7 @@ let bruteForceParIreg [m][d][k]
                 else  (dists, knn, j, false)
       let knn_sort = sortPartSortedSeqs knn
       in  knn_sort
-      
+
 -- SEGMENTED VERSION
 -- query: query point to be searched for
 -- knn0:  Initial knns
@@ -137,7 +137,7 @@ let bruteForceSegPar [m][d][k] (query: [d]f32)
                        : [k](i32,f32) = #[unsafe]
   let B = avg_leafsize -- avg_leafsize
   let knn = copy knn0
-  let visited = replicate k (-1i64) 
+  let visited = replicate k (-1i64)
   let cycle = true
   let j = 0i32
   let (_, knn, _, _) =
@@ -200,7 +200,7 @@ entry mk_input
   let knn_val = replicate kk f32.highest
   let knn_inds= replicate num_queries knn_ind
   let knn_vals= replicate num_queries knn_val
-  let refs = tabulate_2d num_leaves leaf_size 
+  let refs = tabulate_2d num_leaves leaf_size
         (\ _ii i -> let delta = f32.i64 (i+1) / f32.i64 leaf_size
                     in  map (*delta) query
         ) |> flatten
@@ -209,7 +209,7 @@ entry mk_input
 
 -- Brute Force Intra-Parallel Regular (kk = 8, d = 16, n = 1024*1024=1048576, m = leaf_size * num_leaves = 1024 * 1024 = 1048576)
 -- ==
--- entry: runBruteForceReg runBruteForceIreg runBruteForceIregCos
+-- entry: runBruteForceReg runBruteForceIrreg runBruteForceIrregCos
 --
 -- "fix-pattern-512-512" script input { mk_input 512i64 512i64 262144i64 }
 -- "fix-pattern-1024-1024" script input { mk_input 1024i64 1024i64 1048576i64 }
@@ -233,7 +233,7 @@ entry runBruteForceReg [n][m][d]
   let knns =  imap3intra queries knns0 begs f
   in  map unzip knns |> unzip
 
-entry runBruteForceIreg [n][m][d]
+entry runBruteForceIrreg [n][m][d]
         (leaf_size:  i64)
         (num_leaves: i64)
         (queries:  [n][d]f32)
@@ -248,10 +248,10 @@ entry runBruteForceIreg [n][m][d]
   let f query knn0 beg =
     bruteForceSegPar query knn0 beg leaf_size 256 ref_pts
   --
-  let knns =  imap3intra queries knns0 (map i64.i32 begs) f 
+  let knns =  imap3intra queries knns0 (map i64.i32 begs) f
   in  map unzip knns |> unzip
 
-entry runBruteForceIregCos [n][m][d]
+entry runBruteForceIrregCos [n][m][d]
         (leaf_size:  i64)
         (num_leaves: i64)
         (queries:  [n][d]f32)
@@ -264,23 +264,23 @@ entry runBruteForceIregCos [n][m][d]
   let knns0 = map2 zip knn_inds knn_vals
   --
   let f query knn0 beg =
-    bruteForceParIreg query knn0 beg leaf_size leaf_size ref_pts
+    bruteForceParIrreg query knn0 beg leaf_size leaf_size ref_pts
   --
-  let knns =  imap3intra queries knns0 (map i64.i32 begs) f 
+  let knns =  imap3intra queries knns0 (map i64.i32 begs) f
   in  map unzip knns |> unzip
 
 
--- Validating Brute Force Intra-Parallel Regular vs Iregular 
+-- Validating Brute Force Intra-Parallel Regular vs Irregular
 -- ==
--- entry: equivRegIreg
+-- entry: equivRegIrreg
 --
 -- "fix-pattern-512-512" script input { mk_input 512i64 512i64 262144i64 }
 -- output { true }
 -- "fix-pattern-1024-1024" script input { mk_input 1024i64 1024i64 1048576i64 }
 -- output { true }
 
-  
-entry equivRegIreg [n][m][d]
+
+entry equivRegIrreg [n][m][d]
         (leaf_size:  i64)
         (num_leaves: i64)
         (queries:  [n][d]f32)
@@ -300,12 +300,12 @@ entry equivRegIreg [n][m][d]
   let ref_pts = refs' :> [num_leaves*leaf_size][d]f32
   let f1 query knn0 beg =
     bruteForceSegPar query knn0 beg leaf_size 256 ref_pts
-  let knns_ireg1 =  imap3intra queries knns0 (map i64.i32 begs) f1 |> opaque
+  let knns_irreg1 =  imap3intra queries knns0 (map i64.i32 begs) f1 |> opaque
   --
   let f2 query knn0 beg =
-    bruteForceParIreg query knn0 beg leaf_size leaf_size ref_pts
-  let knns_ireg2 =  imap3intra queries knns0 (map i64.i32 begs) f2 |> opaque
+    bruteForceParIrreg query knn0 beg leaf_size leaf_size ref_pts
+  let knns_irreg2 =  imap3intra queries knns0 (map i64.i32 begs) f2 |> opaque
 
-  let ok1 = map2 (==) knns_reg knns_ireg1 |> reduce (&&) true
-  let ok2 = map2 (==) knns_reg knns_ireg2 |> reduce (&&) true
+  let ok1 = map2 (==) knns_reg knns_irreg1 |> reduce (&&) true
+  let ok2 = map2 (==) knns_reg knns_irreg2 |> reduce (&&) true
   in  (ok1 && ok2)
