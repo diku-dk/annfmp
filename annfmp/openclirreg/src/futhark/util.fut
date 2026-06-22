@@ -68,20 +68,6 @@ def mkIrFlagArray 't [m]
     in (shp_scn, r)
 
 
-let partition2Ind [n] (cs: [n]bool) : ([n]i32, i32) =
-    let tfs = map (\f -> if f then 1 else 0) cs
-    let isT = scan (+) 0 tfs
-    let ffs = map (\f -> if f then 0 else 1) cs
-    let isF0 = scan (+) 0 ffs
-
-    let i = isT[n-1]
-    let isF = map (+ i) isF0
-    let inds = map3 (\ c iT iF ->
-                        if c then iT-1 else iF-1
-                    ) cs isT isF
-    let inds_gather = scatter isT (map (\x -> i64.i32 x) inds) (map (\x -> i32.i64 x) (iota n))
-    in (inds_gather, i)
-
 let sumSqrs [d] (xs: [d]f32) (ys: [d]f32) : f32 =
     map2 (\x y -> let z = x-y in z*z) xs ys |> reduce (+) 0.0f32
 

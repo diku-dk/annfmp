@@ -7,7 +7,7 @@ let findLeaf [q][d] (median_dims: [q]i32) (median_vals: [q]f32)
   let leaf =
     loop (node_index) = (0)
       while !(isLeaf height node_index) do
-        if query[median_dims[node_index]] <= median_vals[node_index]
+        if query[median_dims[node_index]] < median_vals[node_index]
         then (node_index+1)*2-1
         else (node_index+1)*2
   in leaf - (i32.i64 q)
@@ -108,7 +108,7 @@ let traverseOnce [q] [d] (height: i32)
               let stack = setPackedInd stack count false
               -- let stack[count] = false
               let node_index =
-                  if query[median_dims[node_index]] <= median_vals[node_index]
+                  if query[median_dims[node_index]] < median_vals[node_index]
                   then (node_index+1)*2-1
                   else (node_index+1)*2
               in (node_index, stack, count)

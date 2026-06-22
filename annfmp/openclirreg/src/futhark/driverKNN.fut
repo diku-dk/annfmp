@@ -64,41 +64,9 @@ entry reducePatchDim [n][d][d_red] (img: [n][d]u8) (comps: [d_red][d]f32) (means
            ) comps
       ) img
 
--- this reduces the dimensionality of patches without
--- manifesting the array of large patches but is slower!
-let reducePatchDim_OLD [d][d_red][h][w][c] (img: [h][w][c]i32) (comps: [d_red][d]f32) (means: [d]f32) : [][d_red]f32 =
-  let pp = d / c
-  let p  = i32.f32 (f32.sqrt (f32.i64 pp))
-  let n_cols = i32.i64 w - p + 1
-  let n_rows = i32.i64 h - p + 1
-  let n_all  = n_cols*n_rows
-  in
-  map (\ ind_patch ->
-        map (\ (comp: [d]f32) ->
-              let ii = opaque (ind_patch / n_cols)
-              let jj = opaque (ind_patch - (ii * n_cols))
-              in  f32.sum <|
-                  map3(\ (ijk: i32) (cmp: f32) (m: f32) ->
-                        let ij = ijk / i32.i64 c
-                        let k  = ijk - (ij * i32.i64 c)
-                        let i  = ij / p
-                        let j  = ij - (i * p)
-                        let v_img = f32.i32 (img[ii+i, jj+j, k])
-                        in  ( v_img - m ) * cmp
-                      ) (map i32.i64 (iota d)) comp means
-            ) comps
-      ) (map i32.i64 (iota (i64.i32 n_all)))
-
-
 ----------------------------------------------
 --- Selecting the best NN from large patch ---
 ----------------------------------------------
-
-entry selectBestNN_BAD [n][w1][w2][h1][h2][c]
-                    (_p: i32) (knn_inds: [n][kk]i32)
-                    (_imgA: [h1][w1][c]f32) (_imgB: [h2][w2][c]f32)
-                  : ([n]i32, [n]f32) =
-  (knn_inds[:,0], replicate n 0.0f32)
 
 entry selectBestNN [n][w1][w2][h1][h2][c]
                     (p: i32) (knn_inds: [n][kk]i32)
@@ -197,79 +165,9 @@ entry findNaturalLeavesFixK [m][d][q][p][n]
                           (*[n][kk]i32, *[n][kk]f32, *[n]i32) =
   findNaturalLeaves kk ref_pts shp median_dims median_vals queries
 
-
-
--- ==
--- entry: testfindNaturalLeaves
--- compiled random input { 8i64 [1048576][40]f32 1024i64 [1023]i32 [1023]f32 [1024][40]f32 }
-entry testfindNaturalLeaves [m][d][q][n] (k: i64)
-                                (ref_pts:  [m][d]f32)
-                                (p: i64)
-                                (median_dims: [q]i32)
-                                (median_vals: [q]f32)
-                                (queries:  [n][d]f32) :
-                                (*[n][k]i32, *[n][k]f32, *[n]i32) =
-
-
-  let shp = replicate p (m/p)
-  let (knn_inds, knn_vals, query_leaves0) = findNaturalLeaves k ref_pts shp median_dims median_vals queries
-  in (knn_inds, knn_vals, query_leaves0)
-
 -----------------------------
 --- Finding the exact knn ---
 -----------------------------
-let exactKnnOld [m][q][d][n][k]
-              (ref_pts: [m][d]f32)
-              (kd_tree: [q](i32,f32,i32))
-              (queries: [n][d]f32)
-              (nat_leaves :[n]i32)
-              (knns:    [n][k](i32,f32)) : ([n][k](i32,f32), i32) =
-  let (h, ppl, num_leaves) = getHeightPpl (i32.i64 q) (i32.i64 m)
-
-  let ref_pts_tmp = ref_pts :> [num_leaves*ppl][d]f32
-  let leaves = unflatten ref_pts_tmp
-  -- let leaves = unflatten num_leaves ppl ref_pts
-
-  let last_leaves = nat_leaves
-  let stacks = replicate n 0i32
-  let dists  = replicate n 0.0f32
-  let ord_knns = copy knns
-  let query_inds = map i32.i64 (iota n)
-  let n' = n
-  let i = 0i32
-
-  let (_,_,_,_,_, ord_knns', _, loop_count, _) =
-      loop (queries, knns, last_leaves, stacks, dists, ord_knns, query_inds, i, n')
-        while n' > 0 do
-        --while (length queries > 0) do
-          let wnns = map (\arr -> arr[k-1].1) knns
-          let (new_leaves, new_stacks, new_dists) = unzip3 <|
-            map2 (traverseOnce h kd_tree) (zip queries wnns) (zip3 last_leaves stacks dists)
-
-          let (inds_part, n'') = partition2Ind <| map (\i -> new_leaves[i] < i32.i64 num_leaves) (iota n')
-          let n'' = i64.i32 n''
-          let qinds_part = gather1D query_inds inds_part
-
-          -- let (inds1, inds2) = split n'' <| zip inds_part qinds_part
-          -- let (iota_valid, query_inds') = unzip inds1
-          -- let (iota_done,  qinds_updt ) = unzip inds2
-          let (iota_valid, query_inds') = (inds_part[0: n''], qinds_part[0: n''])
-          let (iota_done,  qinds_updt ) = (inds_part[n'' : ], qinds_part[n'' : ])
-
-          -- get valid part of arrays
-          let queries' =  gather2D queries iota_valid
-          let knns'    =  gather2D knns    iota_valid
-          let (new_leaves', new_stacks', new_dists') = unzip3 <|
-                          gather1D (zip3 new_leaves new_stacks new_dists) iota_valid
-
-          -- update global knns
-          let ord_knns' = scatter2D ord_knns qinds_updt (gather2D knns iota_done)
-
-          -- do brute force
-          let knns'' = map3 (\query knn leaf_ind -> bruteForcePar query knn (leaf_ind * i32.i64 ppl, leaves[leaf_ind]))
-                            queries' knns' new_leaves'
-          in  (queries', knns'', new_leaves', new_stacks', new_dists', ord_knns', query_inds', i+1, n'')
-  in  (ord_knns', loop_count)
 
 let exactKnn [m][q][d][n][k][p]
               (ref_pts: [m][d]f32)
